@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software or the data it produces, please cite it as below."
+title: "bdq-cfz-mic-atlas: a quantitative atlas of Rv0678 and MmpL5 mutation effects on bedaquiline and clofazimine MICs"
+abstract: >-
+  An open, versioned resource quantifying how mutations in the Rv0678 and MmpL5
+  efflux axis shift bedaquiline and clofazimine minimum inhibitory
+  concentrations in Mycobacterium tuberculosis, together with a reproducible
+  pipeline that regenerates the resource against each new release of the
+  CRyPTIC Consortium Dataset.
+type: software
+authors:
+  - family-names: "Baktiyarova"
+    given-names: "Amina"
+    orcid: "https://orcid.org/0009-0007-6265-6493"
+    affiliation: "Independent Researcher"
+license: MIT
+repository-code: "https://github.com/aminabaktiyarova/bdq-cfz-mic-atlas"
+keywords:
+  - tuberculosis
+  - antimicrobial resistance
+  - bedaquiline
+  - clofazimine
+  - minimum inhibitory concentration
+  - Rv0678
+  - MmpL5
+  - cross-resistance
+  - genomic epidemiology
+references:
+  - type: dataset
+    title: "The CRyPTIC Consortium Dataset"
+    version: "v3.4.0"
+    doi: "10.5281/zenodo.15680920"
+    license: CC-BY-4.0
+    authors:
+      - name: "The CRyPTIC Consortium"
+      - family-names: "Fowler"
+        given-names: "Philip"
+        orcid: "https://orcid.org/0000-0003-0912-4483"
