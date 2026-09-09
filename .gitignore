@@ -1,0 +1,27 @@
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# CRyPTIC source data. Never committed. It is 1 GB or more, it is redistributed
+# under CC BY 4.0 from Zenodo, and the version DOI in docs/PROVENANCE.md is what
+# makes the work reproducible, not a copy in this repository.
+data/
+
+# Restricted-licence and personal-data inputs. Kept physically separate from the
+# rest of the project so they cannot reach a released artifact.
+#   EFFECTS.parquet and PREDICTIONS.parquet carry WHO catalogue grades and
+#   verbatim catalogue text under CC BY-NC-SA 3.0 IGO.
+#   The BASHTHEBUG tables carry volunteer usernames, user IDs and IP addresses.
+quarantine/
+
+# Belt and braces: no columnar data file of any kind gets committed.
+*.parquet
+*.csv.gz
+
+# macOS
+.DS_Store
+
+# Scratch
+scratch/
+*.tmp

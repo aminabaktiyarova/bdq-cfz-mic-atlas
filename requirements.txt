@@ -1,0 +1,24 @@
+# Trajectory B analysis environment
+# Python 3.14.7
+# Every version below was checked against PyPI for a CPython 3.14 macOS wheel.
+# Versions are pinned exactly so the environment is reproducible from this file alone.
+
+pandas==3.0.5
+numpy==2.5.2
+pyarrow==25.0.1
+scipy==1.18.1
+statsmodels==0.15.0
+matplotlib==3.11.1
+tqdm==4.70.0
+
+# Deliberately excluded:
+#
+# lifelines      pins pandas<3.0 and would force a downgrade. Interval-censored
+#                fitting is written directly on scipy.optimize instead.
+#
+# gnomonicus     pins numpy==1.26.1 and pandas==2.1.1, both capped at CPython 3.12.
+# gumpy          its dependency bio-grumpy declares requires_python <3.13.
+# piezo          These belong in a separate Python 3.12 environment, created only
+# bio-grumpy     if the toolchain is run directly. Mutation names in the CRyPTIC
+#                tables are already GARC-normalised upstream, so this is not
+#                needed for the atlas as scoped.
