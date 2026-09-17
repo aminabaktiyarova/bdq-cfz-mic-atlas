@@ -11,6 +11,10 @@ statsmodels==0.15.0
 matplotlib==3.11.1
 tqdm==4.70.0
 
+# Testing. The suite runs against synthetic data built to the CRyPTIC schema,
+# so it needs no downloaded data and completes in about half a minute.
+pytest==9.1.1
+
 # Deliberately excluded:
 #
 # lifelines      pins pandas<3.0 and would force a downgrade. Interval-censored

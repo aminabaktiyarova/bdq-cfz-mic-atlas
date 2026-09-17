@@ -62,6 +62,30 @@ python code/verify_setup.py
 present, and recomputes known sample and resistance counts against the recorded
 figures. It fails loudly if the local data is a different release.
 
+## Tests
+
+```
+pytest
+```
+
+The suite runs against a synthetic dataset built to the CRyPTIC schema with
+known ground truth planted in it, so it needs no downloaded data and finishes in
+about half a minute.
+
+It checks the things the results depend on rather than the things that are easy
+to check. That a null call and a het call are not variants and not wild type.
+That a minor-allele indel excludes a sample from the reference group, as a het
+call does. That a reported MIC is treated as the interval below it rather than
+as a measurement, and that the censored estimator recovers parameters a median
+cannot. That the Mantel-Haenszel estimate recovers a known odds ratio across
+sites of different baseline risk, and that the homogeneity test fires when the
+effect differs between them. That collapsing clonal clusters removes an effect
+planted so as to be driven entirely by one outbreak. That the prediction
+interval is never narrower than the discovery and held-out errors combined.
+
+Each test was verified by breaking the code it covers and confirming the test
+fails.
+
 ## Licensing
 
 Code under MIT, derived data under CC BY 4.0. WHO catalogue content and the
