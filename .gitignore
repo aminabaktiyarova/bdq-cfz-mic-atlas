@@ -1,6 +1,7 @@
 # Python environment
 .venv/
 __pycache__/
+.pytest_cache/
 *.pyc
 
 # CRyPTIC source data. Never committed. It is 1 GB or more, it is redistributed

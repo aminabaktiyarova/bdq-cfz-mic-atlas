@@ -1,0 +1,146 @@
+"""
+Tests that the repository's documentation matches what the code produces.
+
+A column released without an entry in the data dictionary ships undocumented,
+and an entry for a column that does not exist misleads. The atlas table is
+checked against a run on the synthetic dataset, in tests/test_atlas.py. The
+remaining tables are checked here against whatever the modules last wrote, so
+this passes on a machine that has never downloaded the CRyPTIC data.
+"""
+
+import csv
+import re
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+DICTIONARY = ROOT / "docs" / "DATA_DICTIONARY.md"
+
+
+def documented_columns(table_name):
+    text = DICTIONARY.read_text()
+    parts = text.split(f"## outputs/{table_name}")
+    if len(parts) != 2:
+        return None
+    body = parts[1].split("\n---")[0]
+    return re.findall(r"^\| `([A-Za-z0-9_ ()%]+)` \|", body, re.M)
+
+
+def written_tables():
+    return sorted((ROOT / "outputs").glob("*.csv"))
+
+
+def test_the_dictionary_exists_and_names_its_tables():
+    text = DICTIONARY.read_text()
+    assert "# Data dictionary" in text
+    assert re.findall(r"^## outputs/[\w.]+\.csv$", text, re.M)
+
+
+@pytest.mark.parametrize("name", [path.name for path in written_tables()]
+                         or ["no table written yet"])
+def test_every_written_table_is_documented(name):
+    if name == "no table written yet":
+        pytest.skip("no derived table on disk; run the modules first")
+    columns = next(csv.reader((ROOT / "outputs" / name).open()))
+    documented = documented_columns(name)
+    assert documented is not None, f"{name} has no section in the data dictionary"
+    assert columns == documented
+
+
+def runnable_modules():
+    """Modules with a main block, which are the ones a reader runs."""
+    return sorted(path.name for path in (ROOT / "code").glob("*.py")
+                  if "__main__" in path.read_text())
+
+
+def run_list():
+    """The fenced block under the heading that tells a reader what to run."""
+    readme = (ROOT / "README.md").read_text()
+    section = readme.split("## Running the analysis")[1]
+    return section.split("```")[1]
+
+
+def named_in(section):
+    return set(re.findall(r"code/([\w.]+\.py)", section))
+
+
+def test_the_readme_accounts_for_every_runnable_module():
+    assert set(runnable_modules()) <= named_in((ROOT / "README.md").read_text())
+
+
+def test_the_run_list_holds_every_analysis_module():
+    """A module added without a line in that block would be undiscoverable.
+    Naming it elsewhere in the README does not put it in a reader's hands.
+    The setup modules are exempt: they have their own section."""
+    readme = (ROOT / "README.md").read_text()
+    setup = readme.split("## Reproducing the environment")[1].split("\n## ")[0]
+    expected = set(runnable_modules()) - named_in(setup)
+    assert expected
+    assert expected <= named_in(run_list())
+
+
+def test_the_readme_names_no_module_that_is_absent():
+    readme = (ROOT / "README.md").read_text()
+    named = set(re.findall(r"code/([\w.]+\.py)", readme))
+    on_disk = {path.name for path in (ROOT / "code").glob("*.py")}
+    assert named <= on_disk
+
+
+def test_the_readme_points_at_the_data_dictionary():
+    readme = (ROOT / "README.md").read_text()
+    assert "docs/DATA_DICTIONARY.md" in readme
+
+
+def documented_values(table_name, column):
+    """The values a dictionary entry names in backticks, for a column whose
+    entry enumerates them."""
+    text = DICTIONARY.read_text()
+    body = text.split(f"## outputs/{table_name}")[1].split("\n---")[0]
+    row = [line for line in body.splitlines()
+           if line.startswith(f"| `{column}` |")]
+    return set(re.findall(r"`([^`]+)`", row[0])) - {column} if row else set()
+
+
+def test_every_kind_of_estimate_is_named_in_the_dictionary():
+    """The estimates table stacks several kinds of estimate in one column. A
+    kind added without an entry ships unexplained."""
+    path = ROOT / "outputs" / "heteroresistance_estimates.csv"
+    if not path.exists():
+        pytest.skip("the estimates table has not been written")
+    rows = list(csv.DictReader(path.open()))
+    written = {row["estimate"] for row in rows}
+    assert written
+    assert written <= documented_values("heteroresistance_estimates.csv",
+                                        "estimate")
+
+
+def test_the_readme_names_every_document():
+    """A document nobody is pointed at is a document nobody reads."""
+    readme = (ROOT / "README.md").read_text()
+    missing = [path.name for path in sorted((ROOT / "docs").glob("*.md"))
+               if path.name not in readme]
+    assert not missing
+
+
+def test_the_results_document_cites_only_tables_that_exist():
+    results = ROOT / "docs" / "RESULTS.md"
+    if not results.exists():
+        pytest.skip("no results document")
+    cited = set(re.findall(r"outputs/([\w.]+\.csv)", results.read_text()))
+    assert cited
+    present = {path.name for path in (ROOT / "outputs").glob("*.csv")}
+    assert cited <= present
+
+
+def test_the_results_document_names_no_quarantined_table():
+    """The licence boundary has to hold in the released text, not only in the
+    code that produced it."""
+    results = ROOT / "docs" / "RESULTS.md"
+    if not results.exists():
+        pytest.skip("no results document")
+    paragraphs = results.read_text().split("\n\n")
+    for table in ("EFFECTS", "PREDICTIONS", "ANTIBIOGRAM"):
+        for paragraph in paragraphs:
+            if table in paragraph:
+                assert "excluded from" in paragraph, paragraph

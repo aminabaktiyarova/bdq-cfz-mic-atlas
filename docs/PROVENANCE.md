@@ -3,8 +3,9 @@
 Researcher: Amina Baktiyarova, Independent Researcher, ORCID 0009-0007-6265-6493
 
 This file records exactly which data version, licence and documentation this project rests
-on, and what the schema says. Every figure published from this project traces back to what
-is written here. Facts below were read directly off the Zenodo record, DATA_SCHEMA.pdf and
+on, what the schema says, and what the input tables contain. Every figure published from
+this project traces back to what is written here. What was computed from these inputs is
+recorded separately, in RESULTS.md. Facts below were read directly off the Zenodo record, DATA_SCHEMA.pdf and
 RELEASE_NOTES.md. Items marked PLACEHOLDER are not yet verified and must not be filled in
 with an assumption.
 
@@ -37,8 +38,8 @@ Schema document: "CRyPTIC Release 3.4.0 Schema", PWF, 21 May 2025, DATA_SCHEMA.p
 The v3.4.0 record does not state how many samples have MICs measured on UKMYC5 or UKMYC6
 plates. The v2.1.2 record stated 21,570 for that subset, but v2.1.2 was processed
 differently and its figure does not carry over.
-PLACEHOLDER: number of v3.4.0 samples with UKMYC5/UKMYC6 MIC data, per drug, to be computed
-from UKMYC_PHENOTYPES.
+Computed from UKMYC_PHENOTYPES: 21,685 samples across 288,904 rows. Per-drug counts are in
+"UKMYC_PHENOTYPES: actual shape" below.
 
 ## File inventory (19 files, 2.6 GB total)
 
@@ -200,10 +201,8 @@ and for non-UKMYC comparison, not as the primary MIC source.
 
 ## Schema question 4: drug codes
 
-The DRUG_CODE table maps DRUG_3_LETTER_CODE to DRUG_NAME.
-PLACEHOLDER: the actual three-letter codes for bedaquiline, clofazimine, delamanid and
-linezolid have not been read from the file. Confirm from DRUG_CODES.csv.gz (385 bytes)
-rather than assuming the conventional abbreviations.
+The DRUG_CODE table maps DRUG_3_LETTER_CODE to DRUG_NAME. Read from DRUG_CODES.csv.gz: the
+codes are the conventional abbreviations, listed under "Drug codes" below.
 
 ## Schema question 5: VARIANTS versus MUTATIONS
 
@@ -271,21 +270,26 @@ PLATE_LAYOUT.BINARY_PHENOTYPE holds the ECOFF-derived R or S call per dilution. 
 intermediate category was removed from UKMYC5 and UKMYC6 and the ECOFF applied as defined in
 the ECOFF paper, so no intermediate results appear for UKMYC plates in DST_MEASUREMENTS.
 
-PLACEHOLDER: the exact set of strings used in MIC for censored values in v3.4.0, and whether
-LOG2MIC is populated on censored rows. Read from UKMYC_PHENOTYPES.parquet before any
-statistical handling is designed.
+Read from UKMYC_PHENOTYPES.parquet. The censoring strings are given under "MIC censoring
+convention" below. LOG2MIC is populated on every row that carries a MIC, censored or not,
+and carries no marker of censoring, so it cannot distinguish a censored reading from an
+interior one. On right-censored rows it is one doubling above the concentration written in
+MIC: ">2" carries 2.00 where log2 of 2 is 1. Checked across all 288,904 rows. For interior
+and left-censored rows it is log2 of the stated concentration, within the 0.002 that
+CRyPTIC's rounded concentration labels introduce. Every censoring decision in this project
+therefore parses the MIC string and no step reads LOG2MIC as a measurement.
 
 ## Open items raised by the schema and release notes
 
 1. The schema lists AMYGDA_DILUTION in UKMYC_PHENOTYPES and shows no TMAS column, although
-   the release notes state TMAS replaced AMyGDA in this version. PRIMARY_METHOD is the
-   likely place a TMAS reading is named. PLACEHOLDER: confirm which column holds the TMAS
-   reading and what values PRIMARY_METHOD takes.
+   the release notes state TMAS replaced AMyGDA in this version. Resolved against the file:
+   a TMAS_DILUTION column exists and the schema does not draw it. PRIMARY_METHOD names the
+   laboratory scientist's reading method rather than an automated one, taking VZ and MB.
 2. GENOMES carries SPECIES, LINEAGE, SUBLINEAGE and N_LINEAGES. The v2.0.0 notes stated
    lineage was missing because no samples had been run through Mykrobe. The Pathogena
-   pipeline used from Release Three onwards does speciate. PLACEHOLDER: confirm whether
-   LINEAGE and SUBLINEAGE are populated in v3.4.0. If they are, lineage assignment does not
-   need a separate TB-Profiler or Mykrobe run.
+   pipeline used from Release Three onwards does speciate. Resolved against the file: both
+   columns are fully populated, with sublineage resolved to four levels, so no separate
+   TB-Profiler or Mykrobe run is needed. Counts are under "GENOMES" below.
 3. The 425 new National University of Singapore samples have phenotypes with no matching
    genetics, listed as future work.
 4. Samples added in groups 6 and 7 have no COUNTRY_CODE in DST_SAMPLES.
@@ -309,6 +313,11 @@ benchmarking, keep them out of the released core tables.
 BASHTHEBUG_CLASSIFICATIONS is quarantined for a separate reason. It contains USER_NAME,
 USER_ID and USER_IP for the volunteers, which is personal data. It is never redistributed,
 in whole or in part, and no derived table retains any of those three columns.
+
+No figure computed from EFFECTS, PREDICTIONS or GENOMES.ANTIBIOGRAM is reproduced anywhere
+in this repository. Every count, shift and interval published here derives from mutation
+strings in MUTATIONS.parquet, from UKMYC_PHENOTYPES.parquet, from PLATE_LAYOUT.parquet, from
+GENOMES.parquet excluding its ANTIBIOGRAM column, and from the reference lookups.
 
 ## Interpretive choices already baked into CRyPTIC's predictions
 
@@ -387,6 +396,29 @@ AMI, BDQ, CFZ, DLM, EMB, ETH, INH, KAN, LEV, LZD, MXF, PAS, RFB, RIF.
 Plate designs: UKMYC6 190,372 rows, UKMYC5 98,532.
 Reading day: 14 (268,545), 21 (19,239), 10 (1,120).
 
+Rows, samples and rows carrying a MIC, per drug:
+
+| Drug | Rows | Samples | With a MIC | UKMYC5 | UKMYC6 |
+| --- | --- | --- | --- | --- | --- |
+| AMI | 21,685 | 21,685 | 21,475 | 7,041 | 14,644 |
+| BDQ | 21,681 | 21,681 | 21,437 | 7,037 | 14,644 |
+| CFZ | 21,683 | 21,683 | 21,474 | 7,039 | 14,644 |
+| DLM | 21,683 | 21,683 | 21,367 | 7,039 | 14,644 |
+| EMB | 21,681 | 21,681 | 21,485 | 7,037 | 14,644 |
+| ETH | 21,681 | 21,681 | 21,467 | 7,037 | 14,644 |
+| INH | 21,682 | 21,682 | 21,316 | 7,038 | 14,644 |
+| KAN | 21,684 | 21,684 | 21,461 | 7,040 | 14,644 |
+| LEV | 21,681 | 21,681 | 21,519 | 7,037 | 14,644 |
+| LZD | 21,681 | 21,681 | 21,520 | 7,037 | 14,644 |
+| MXF | 21,681 | 21,681 | 21,516 | 7,037 | 14,644 |
+| PAS | 7,038 | 7,038 | 6,882 | 7,038 | 0 |
+| RFB | 21,682 | 21,682 | 21,480 | 7,038 | 14,644 |
+| RIF | 21,681 | 21,681 | 21,358 | 7,037 | 14,644 |
+
+One row per sample per drug throughout. PAS is carried on UKMYC5 only, which is why its
+count is the UKMYC5 total. 3,147 rows carry no MIC, and LOG2MIC is absent on exactly those
+rows.
+
 The 21,685 figure supersedes the 21,570 quoted for v2.1.2. Note the count of drugs is 14,
 not the 13 quoted in the published papers, because UKMYC5 and UKMYC6 differ in composition.
 
@@ -408,8 +440,16 @@ and counts: VZ,TM AGREE 195,939; ALL DISAGREE 28,822; VZ ONLY 27,125; BB,TM AGRE
 VZ,BB AGREE 10,393; BB RUNNING 5,963. VZ is the Vizion reading by the laboratory scientist,
 BB is BashTheBug, TM is TMAS.
 
-PRIMARY_METHOD takes two values: VZ 287,292 and MB 1,612.
-PLACEHOLDER: what MB denotes is not documented in the schema or release notes.
+PRIMARY_METHOD takes two values: VZ 287,292 and MB 1,612. Neither is defined in the schema
+or the release notes. The plate-validation paper reads every MIC by three methods, naming
+them as the Vizion digital viewing system, a mirrored box and an inverted-light microscope,
+and abbreviates the second MB: Rancoita PM, Cugnata F, Cruz AL, Borroni E, Hoosdally SJ,
+Walker TM, Grazian C, Davies TJ, Peto TEA, Crook DW, Fowler PW, Cirillo DM, for the CRyPTIC
+Consortium. Validating a 14-drug microtiter plate containing bedaquiline and delamanid for
+large-scale research susceptibility testing of Mycobacterium tuberculosis. Antimicrobial
+Agents and Chemotherapy 2018, 62(9):e00344-18, doi 10.1128/AAC.00344-18. On that reading VZ
+is the Vizion and MB the mirrored box, both scientist readings rather than automated ones.
+Attributed to that paper, not confirmed by CRyPTIC documentation for this column.
 
 ## High-confidence proportion does not reconcile
 
@@ -417,8 +457,10 @@ The v3.4.0 release notes state TMAS raised the proportion of high-confidence MIC
 to 88.7%. Computed from this table, HIGH is 226,994 of 288,904 rows, 78.6%. Restricting to
 rows carrying a MIC gives 79.1%. Excluding rows still marked BB RUNNING gives 80.2%, and
 both restrictions together give 80.7%. None reaches 88.7%.
-PLACEHOLDER: the denominator CRyPTIC used for 88.7% is not identified. Do not cite that
-figure without resolving it. Cite the figure computed from the version used instead.
+PLACEHOLDER: the denominator CRyPTIC used for 88.7% is not identified. The TMAS paper cited
+under "Method papers" does not carry either figure, reporting 98.8% essential agreement
+against ground truth instead, so the release notes remain the only source. Do not cite
+88.7% without resolving it. Cite the figure computed from the version used instead.
 
 ## MIC censoring convention (question 8, now answered)
 
@@ -459,11 +501,16 @@ step drops out of the plan.
 
 TB_COVERAGE median 99.30%, TB_DEPTH median 90.0x.
 PIPELINE_BUILD takes six values, so the cohort was not processed under a single build.
+
 ANTIBIOGRAM is a 14-character R/S/U string, one character per drug. It is catalogue-derived
-and therefore falls under the same quarantine as EFFECTS and PREDICTIONS.
+and therefore falls under the same quarantine as EFFECTS and PREDICTIONS. No figure in this
+repository is computed from it.
 
 The 54,057 row count does not match the 53,897 stated on the record as having both WGS and
-pDST. PLACEHOLDER: the 160-sample difference is unexplained.
+pDST. PLACEHOLDER: the 160-sample difference is unexplained and cannot be resolved from the
+files on disk. The record's figure counts samples with any pDST result, which lives in
+DST_MEASUREMENTS, and that file downloaded as 92 bytes and does not open as parquet.
+UKMYC_PHENOTYPES covers only the 96-well plate subset and cannot stand in for it.
 
 ## The join: 6,525 MIC samples have no genome
 
@@ -490,8 +537,8 @@ is not random. It is concentrated by site:
 Two sites are lost entirely and one loses seven tenths of its samples. The genome-matched
 cohort is therefore geographically biased relative to the full MIC cohort, and any
 prevalence figure computed on it inherits that bias. This must be stated in any output.
-PLACEHOLDER: the country and description of each SITEID, from SITES.csv.gz, which has not
-been read.
+SITES.csv.gz has been read; the institution and country of every SITEID appear in the site
+table below.
 
 ## Statistical power for the four target drugs
 
@@ -532,141 +579,6 @@ lineage2.2 63, lineage2.2.7 46, lineage2.2.6 20, then smaller groups.
 Lineage2 is the Beijing family, which supplies the regional link to Kazakhstan and Russia.
 PLACEHOLDER: mapping from these sublineage labels to the named B0/W148 and Central Asia
 Outbreak clones has not been established and must not be assumed.
-
-# Genotype findings computed from EFFECTS and PREDICTIONS (v3.4.0)
-
-These two tables are catalogue-derived and quarantined from any released output. The figures
-below were computed to establish feasibility.
-
-## Structure
-
-EFFECTS: 1,154,127 rows, 53,864 samples, 15 drugs. Predictions: S 917,989; R 127,866;
-U 81,122; F 27,150.
-PREDICTIONS: 810,615 rows, 54,041 samples. S 621,919; R 120,552; U 58,269; F 9,875.
-
-Only one catalogue is present in v3.4.0: WHO-UCN-GTB-PCI-2023.5, version 2.0. The WHO first
-edition results described in the v2.1.0 release notes are not carried in this version.
-
-The EVIDENCE column holds JSON containing WHO catalogue text verbatim, including the fields
-FINAL CONFIDENCE GRADING, INITIAL CONFIDENCE GRADING and WHO HGVS, alongside the catalogue's
-own solo-sample counts. This is WHO catalogue expression reproduced in full and reinforces
-the quarantine on these two tables.
-
-## Genes carried per target drug
-
-BDQ: mmpL5 (101,224 rows, all graded S by the reporting rule), Rv0678 (3,481 rows, 2,832
-samples, 733 graded R), pepQ (1,617 rows, 1,584 samples, 17 R), atpE (250 rows, 249 samples,
-16 R).
-
-CFZ: mmpL5, Rv0678 (715 R, 1,325 U), pepQ (16 R).
-
-DLM: fgd1 (34,311 samples), fbiC (5,898 samples, 554 R), Rv2983, fbiA, fbiB, ddn (1,201
-samples, 93 R).
-
-LZD: rrl (7,704 samples, 74 R), rplC (1,746 samples, 203 R, 80 F).
-
-## Solo mutation analysis, bedaquiline pathway
-
-Solo defined as a sample carrying exactly one mutation graded R or U for the drug across the
-catalogue's genes, excluding mmpL5. Restricted to samples with both a genome and a UKMYC MIC.
-
-614 solo samples with paired bedaquiline and clofazimine MICs; 392 with high-quality
-phenotypes on both drugs. By gene:
-
-| Gene | Solo samples | BDQ resistant | CFZ resistant | Median log2 BDQ MIC | Median log2 CFZ MIC |
-| --- | --- | --- | --- | --- | --- |
-| Rv0678 | 383 | 54 | 83 | -3.06 | -3.06 |
-| pepQ | 217 | 4 | 17 | -4.06 | -3.06 |
-| atpE | 14 | 2 | 0 | -4.56 | -4.06 |
-
-Reference group carrying no R or U graded mutation for bedaquiline: 14,531 samples, median
-log2 bedaquiline MIC -5.06, median log2 clofazimine MIC -4.06.
-
-A solo Rv0678 mutation therefore shifts the median bedaquiline MIC by 2 log2 units, a
-fourfold rise, and the median clofazimine MIC by 1 log2 unit, a twofold rise. Despite the
-smaller clofazimine shift, more solo Rv0678 samples cross the clofazimine ECOFF (83) than the
-bedaquiline ECOFF (54), because the clofazimine wild-type population sits closer to its
-ECOFF. A binary catalogue cannot express this asymmetry.
-
-atpE is confirmed as descriptive rather than inferential: 14 solo samples in the entire
-matched cohort. pepQ is better represented than expected at 217 solo samples, and its
-phenotype is consistent with a low-level effect: a 1 log2 shift in bedaquiline MIC with only
-4 samples crossing the ECOFF.
-
-## Rv0678 variant sparsity
-
-383 solo Rv0678 samples carry 152 distinct mutations. 112 are seen once and 28 are seen two
-to four times. Only nine mutations reach eight or more solo samples:
-
-| Mutation | Solo samples | BDQ resistant | CFZ resistant | Median log2 BDQ | Median log2 CFZ |
-| --- | --- | --- | --- | --- | --- |
-| 192_ins_g | 52 | 2 | 2 | -6.06 | -4.06 |
-| 141_ins_c | 39 | 11 | 17 | -2.00 | -2.00 |
-| 138_ins_g | 18 | 4 | 9 | -2.00 | -1.50 |
-| E55D | 18 | 0 | 2 | -4.06 | -3.06 |
-| M146T | 18 | 0 | 3 | -3.06 | -3.06 |
-| L40V | 14 | 0 | 0 | -6.06 | -4.06 |
-| R90C | 12 | 1 | 3 | -2.00 | -3.06 |
-| N98D | 9 | 0 | 0 | -4.06 | -4.06 |
-| N4T | 8 | 0 | 0 | -4.56 | -3.06 |
-
-Per-variant MIC distributions are computable for roughly this handful only. Any resource has
-to work at the level of mutation classes and positions, with per-variant detail for the small
-well-supported set.
-
-Mutation class alone does not separate the phenotype. Indels: 158 samples, 36 distinct, 27
-bedaquiline resistant, median log2 -3.06. Missense and other: 225 samples, 116 distinct, 27
-bedaquiline resistant, median log2 -3.06. Two frameshift insertions illustrate the point:
-192_ins_g in 52 samples is essentially phenotypically silent, while 141_ins_c in 39 samples
-shifts both MICs by around 3 log2 units.
-
-## Lineage structure of the Rv0678 signal
-
-Solo Rv0678 samples by lineage:
-
-| Lineage | Solo samples | BDQ resistant | CFZ resistant |
-| --- | --- | --- | --- |
-| lineage4 | 179 | 8 | 10 |
-| lineage2 | 142 | 30 | 58 |
-| lineage3 | 43 | 11 | 10 |
-| lineage1 | 19 | 5 | 5 |
-
-The same gene produces resistance at 21% in lineage2 against 4.5% in lineage4. This is
-confounded by which mutations occur in which lineage and by site of origin, and is not a
-causal claim. It is the observation that motivates a lineage-stratified analysis and it is
-the concrete link to the Beijing-dominated regional epidemiology.
-
-## Genotypically unexplained resistance
-
-Counting resistant samples that carry no mutation graded R or U for that drug in any of the
-catalogue's genes:
-
-Bedaquiline: 111 of 171 resistant samples, 65%. Restricted to high-quality phenotypes, 85 of
-141, 60%.
-Clofazimine: 574 of 683 resistant samples, 84%. Restricted to high-quality phenotypes, 358 of
-426, 84%.
-
-The unexplained fraction persists at high phenotype quality, so it is not attributable to
-measurement error alone. Other candidate explanations are heteroresistance below the
-detection limit, mechanisms outside the catalogue's gene set, and genuine phenotypic
-variation. This is the quantified gap that a new resource addresses.
-
-## Linezolid solo mutations
-
-Solo samples with a UKMYC linezolid MIC:
-
-| Gene | Solo samples | Distinct mutations | Resistant | Median log2 MIC |
-| --- | --- | --- | --- | --- |
-| rrl | 998 | 270 | 25 | -1.00 |
-| rplC | 193 | 41 | 36 | -1.00 |
-
-rplC C154R alone accounts for 40 solo samples, 29 of them resistant, with a median log2 MIC
-of 2.00 against a population median of -1.00: a shift of three doublings, from 0.5 to 4.0.
-The next largest signal is rrl g2814t at 3 solo samples, all resistant.
-
-The three most common rrl variants, g1052t (211 solo samples), g2399a (112) and c637g (95),
-have median MICs identical to the population median and yield 4, 2 and 5 resistant samples
-respectively. Almost all catalogued rrl variation is phenotypically silent in this dataset.
 
 # Site structure and its consequences
 
@@ -723,31 +635,3 @@ samples. The v3.1.0 release notes state that roughly 1,100 NICD samples were add
 specifically because they are enriched for bedaquiline resistance. The concentration is
 therefore a sampling decision rather than an epidemiological observation, and no prevalence
 figure computed from this dataset can be read as a population estimate.
-
-## The lineage2 signal is substantially confounded by site
-
-Solo Rv0678 samples by site: NICD South Africa 101 (31 bedaquiline resistant), Peru 86 (1),
-Italy 68 (10), Germany 34 (1), China 29 (7), India 29 (1), Vietnam 16 (1), then single
-figures elsewhere. NICD alone contributes 31 of the 54 bedaquiline-resistant solo Rv0678
-samples.
-
-Stratifying the lineage2 against lineage4 comparison by site:
-
-| Site | Country | lineage2 n | lineage2 BDQ R | lineage4 n | lineage4 BDQ R |
-| --- | --- | --- | --- | --- | --- |
-| 10 | South Africa | 64 | 22 | 32 | 5 |
-| 02 | China | 24 | 6 | 4 | 0 |
-| 03 | Germany | 22 | 1 | 10 | 0 |
-| 08 | Vietnam | 12 | 1 | 2 | 0 |
-| 04 | India | 9 | 0 | 3 | 0 |
-| 06 | Italy | 1 | 0 | 33 | 0 |
-| 05 | Peru | 1 | 0 | 85 | 1 |
-
-The pooled contrast of 21% against 4.5% is driven substantially by which sites contribute
-which lineages. Peru and Italy together supply 118 lineage4 solo samples with one resistant
-sample between them, and both are near-zero-lineage2 sites with low resistance throughout.
-NICD is the only site with adequate numbers of both, and there the contrast is 34% against
-16%, roughly half the pooled gap.
-
-Consequence: site must enter any model of the lineage effect as a covariate. The pooled
-lineage figure must not be reported on its own, and the regional argument cannot rest on it.
