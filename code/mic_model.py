@@ -183,6 +183,111 @@ def mic_bounds(mic_text, concentrations):
     return (np.log2(concentrations[position - 1]), np.log2(value))
 
 
+def mic_recorded(value):
+    """
+    True when a reading was recorded for this sample.
+
+    A plate that produced no MIC stores a null, and the null arrives here as
+    None, as a float nan, or as a pandas missing value depending on the pandas
+    version reading the parquet file. A sample with no MIC is a missing
+    measurement, not a value that failed to match the tested series.
+    """
+    import pandas as pd
+
+    if value is None or pd.isna(value):
+        return False
+    return str(value).strip() not in ("", "nan", "None", "<NA>")
+
+
+def place_mics(mic_texts, designs, series, drug):
+    """
+    Convert each reported MIC into its censoring interval.
+
+    Returns (lowers, uppers, absent, off_series). A sample with no MIC recorded,
+    or on a plate design with no tested series, is counted in absent and carries
+    nan bounds. A value that is present and does not match the tested series is
+    collected in off_series, which means the series does not describe the data.
+    """
+    import numpy as np
+
+    lowers, uppers, off_series = [], [], []
+    absent = 0
+    for mic_text, design in zip(mic_texts, designs):
+        concentrations = series.get((design, drug))
+        bounds = mic_bounds(mic_text, concentrations) if concentrations else None
+        if bounds is not None:
+            lowers.append(bounds[0])
+            uppers.append(bounds[1])
+            continue
+        lowers.append(np.nan)
+        uppers.append(np.nan)
+        if concentrations and mic_recorded(mic_text):
+            off_series.append(str(mic_text))
+        else:
+            absent += 1
+    return lowers, uppers, absent, off_series
+
+
+def log_interval_mass(lower, upper):
+    """
+    Log of the standard normal probability mass on each interval [lower, upper].
+
+    Written with logcdf, logsf and log1p rather than as the difference of two
+    cdfs. Far out in a tail the two cdfs agree to most of their digits and
+    subtracting them destroys the rest: the bedaquiline reference group holds
+    intervals carrying a mass of 3e-09, where the difference loses enough
+    precision to corrupt the gradient and stop the optimiser short of the
+    maximum. Each interval is evaluated in the tail it lies in, so the only
+    subtraction is of a number below one from one, inside log1p.
+    """
+    import numpy as np
+    from scipy.stats import norm
+
+    lower = np.asarray(lower, dtype=float)
+    upper = np.asarray(upper, dtype=float)
+    result = np.empty(len(lower))
+
+    left = np.isneginf(lower)
+    right = np.isposinf(upper)
+    result[left] = norm.logcdf(upper[left])
+    result[right] = norm.logsf(lower[right])
+
+    middle = ~left & ~right
+    low, high = lower[middle], upper[middle]
+    mass = np.empty(len(low))
+    in_upper_tail = low > 0
+    tail_low = norm.logsf(low[in_upper_tail])
+    tail_high = norm.logsf(high[in_upper_tail])
+    mass[in_upper_tail] = tail_low + np.log1p(-np.exp(tail_high - tail_low))
+    body_low = norm.logcdf(low[~in_upper_tail])
+    body_high = norm.logcdf(high[~in_upper_tail])
+    mass[~in_upper_tail] = body_high + np.log1p(-np.exp(body_low - body_high))
+    result[middle] = mass
+    return result
+
+
+def log_density_ratios(lower, upper, log_mass):
+    """
+    The standard normal density at each interval bound, divided by the mass on
+    that interval, returned as a pair of arrays.
+
+    Both ratios are formed in log space for the same reason log_interval_mass
+    is: where the mass is 1e-09 the density and the mass are both tiny, their
+    quotient is of order one, and forming it directly loses the digits that
+    carry it. An infinite bound contributes a density of zero.
+    """
+    import numpy as np
+    from scipy.stats import norm
+
+    ratios = []
+    for bound in (np.asarray(lower, dtype=float), np.asarray(upper, dtype=float)):
+        finite = np.isfinite(bound)
+        ratio = np.zeros(len(bound))
+        ratio[finite] = np.exp(norm.logpdf(bound[finite]) - log_mass[finite])
+        ratios.append(ratio)
+    return ratios[0], ratios[1]
+
+
 def fit_censored_normal(lower, upper):
     """
     Maximum likelihood mean and standard deviation of a normal distribution
@@ -190,7 +295,6 @@ def fit_censored_normal(lower, upper):
     """
     import numpy as np
     from scipy.optimize import minimize
-    from scipy.stats import norm
 
     lower = np.asarray(lower, dtype=float)
     upper = np.asarray(upper, dtype=float)
@@ -203,8 +307,7 @@ def fit_censored_normal(lower, upper):
     def negative_log_likelihood(parameters):
         mu, log_sigma = parameters
         sigma = np.exp(log_sigma)
-        probability = norm.cdf((upper - mu) / sigma) - norm.cdf((lower - mu) / sigma)
-        return -np.sum(np.log(np.clip(probability, 1e-12, None)))
+        return -np.sum(log_interval_mass((lower - mu) / sigma, (upper - mu) / sigma))
 
     result = minimize(
         negative_log_likelihood, start, method="L-BFGS-B",
@@ -213,6 +316,67 @@ def fit_censored_normal(lower, upper):
     if not result.success:
         return None
     return {"mu": float(result.x[0]), "sigma": float(np.exp(result.x[1]))}
+
+
+def fit_censored_linear(lower, upper, design):
+    """
+    Maximum likelihood fit of a normal whose mean is a linear function of the
+    columns of `design`, observed only through censoring intervals.
+
+    The same likelihood as fit_censored_normal, with the mean replaced by
+    design @ beta, and with the gradient supplied in closed form. A group
+    indicator beside a set of site indicators gives that group's shift with
+    site held constant, which a single group mean cannot do when the group
+    sits mostly at one site.
+
+    Returns {"beta": array, "sigma": float}, or None where the fit does not
+    converge. beta[0] is the intercept where the first column is ones.
+    """
+    import numpy as np
+    from scipy.optimize import minimize
+
+    lower = np.asarray(lower, dtype=float)
+    upper = np.asarray(upper, dtype=float)
+    design = np.asarray(design, dtype=float)
+    if design.ndim != 2 or len(design) != len(lower):
+        raise ValueError("design must be one row per observation")
+
+    finite = np.concatenate([lower[np.isfinite(lower)], upper[np.isfinite(upper)]])
+    if not len(finite):
+        return None
+    start = np.zeros(design.shape[1] + 1)
+    start[0] = float(finite.mean())
+    start[-1] = np.log(max(float(finite.std()), 0.5))
+
+    def negative_log_likelihood(parameters):
+        """The objective and its gradient, which share the interval mass."""
+        mu = design @ parameters[:-1]
+        sigma = np.exp(parameters[-1])
+        low = (lower - mu) / sigma
+        high = (upper - mu) / sigma
+        log_mass = log_interval_mass(low, high)
+        at_low, at_high = log_density_ratios(low, high, log_mass)
+        # An infinite bound carries a density ratio of zero, and is replaced
+        # by zero before the multiplication rather than after it, so that the
+        # product is never an infinity against a zero.
+        finite_low = np.where(np.isfinite(low), low, 0.0)
+        finite_high = np.where(np.isfinite(high), high, 0.0)
+        gradient = np.empty(len(parameters))
+        gradient[:-1] = design.T @ ((at_high - at_low) / sigma)
+        gradient[-1] = np.sum(finite_high * at_high - finite_low * at_low)
+        return -np.sum(log_mass), gradient
+
+    bounds = [(-25, 25)] + [(-30, 30)] * (design.shape[1] - 1) + [
+        (np.log(0.05), np.log(20))]
+    # The default stopping rule halts about 2e-04 of log likelihood short of
+    # the maximum here, which is enough to move a shift in its third decimal.
+    # With the gradient in closed form the tighter rule costs 0.03 s.
+    result = minimize(negative_log_likelihood, start, method="L-BFGS-B",
+                      jac=True, bounds=bounds,
+                      options={"ftol": 1e-14, "gtol": 1e-9, "maxiter": 2000})
+    if not result.success:
+        return None
+    return {"beta": result.x[:-1], "sigma": float(np.exp(result.x[-1]))}
 
 
 def bootstrap_mu(frame, drug, rng, draws=BOOTSTRAPS):
@@ -275,25 +439,21 @@ def main():
 
     # ------------------------------------------------- build the intervals
     for drug in cohort.DRUGS:
-        lowers, uppers, unplaced = [], [], 0
-        for mic_text, design in zip(df[f"MIC_{drug}"], df[f"PLATEDESIGN_{drug}"]):
-            concentrations = series.get((design, drug))
-            bounds = mic_bounds(mic_text, concentrations) if concentrations else None
-            if bounds is None:
-                unplaced += 1
-                lowers.append(np.nan)
-                uppers.append(np.nan)
-            else:
-                lowers.append(bounds[0])
-                uppers.append(bounds[1])
+        lowers, uppers, absent, off_series = place_mics(
+            df[f"MIC_{drug}"], df[f"PLATEDESIGN_{drug}"], series, drug)
         df[f"lower_{drug}"] = lowers
         df[f"upper_{drug}"] = uppers
-        placed = int(np.isfinite(df[f"lower_{drug}"]).sum() + np.isinf(df[f"lower_{drug}"]).sum())
-        say(f"\n{drug}: {placed:,} of {len(df):,} MICs placed on the tested series, "
-            f"{unplaced:,} could not be placed")
-        if unplaced > len(df) * 0.02:
-            examples = df.loc[df[f"lower_{drug}"].isna(), f"MIC_{drug}"].dropna().unique()[:10]
-            die(f"too many unplaceable {drug} MICs. Examples: {list(examples)}")
+        placed = int(np.isfinite(df[f"lower_{drug}"]).sum()
+                     + np.isinf(df[f"lower_{drug}"]).sum())
+        if placed + absent + len(off_series) != len(df):
+            die(f"{drug}: placed, absent and off-series counts do not sum to "
+                f"{len(df):,}")
+        say(f"\n{drug}: {placed:,} of {len(df):,} MICs placed on the tested series. "
+            f"{absent:,} samples carry no MIC and are excluded from every fit.")
+        if off_series:
+            die(f"{len(off_series)} {drug} MICs carry a value that is not on the "
+                f"tested series, so the series does not describe the data. "
+                f"Examples: {sorted(set(off_series))[:10]}")
 
     # ------------------------------------------------------ fit each group
     say("\n" + "=" * 72)
@@ -315,7 +475,7 @@ def main():
         say(f"  the naive median of the same data is {naive:.2f}, a difference of "
             f"{abs(reference_fit['mu'] - naive):.2f} doublings")
 
-        rows = []
+        rows, not_converged = [], []
         for group in cohort.GROUP_ORDER:
             if group == "reference":
                 continue
@@ -324,6 +484,7 @@ def main():
                 continue
             fit = fit_censored_normal(sub[f"lower_{drug}"], sub[f"upper_{drug}"])
             if fit is None:
+                not_converged.append(f"{group} (n = {len(sub):,})")
                 continue
             interval = bootstrap_mu(sub, drug, rng)
             shift = fit["mu"] - reference_fit["mu"]
@@ -341,6 +502,9 @@ def main():
             records.append({"drug": drug, "group": group, **rows[-1]})
         say("")
         say(pd.DataFrame(rows).to_string(index=False))
+        if not_converged:
+            say("  Absent from the table above because the fit did not converge: "
+                + "; ".join(not_converged))
 
     # ------------------------------------------- by lineage, the key contrast
     say("\n" + "=" * 72)
@@ -352,7 +516,7 @@ def main():
 
     for drug in cohort.DRUGS:
         say(f"\n{drug}:")
-        rows = []
+        rows, not_converged = [], []
         for lineage in ["lineage1", "lineage2", "lineage3", "lineage4"]:
             in_lineage = intact[intact.LINEAGE == lineage]
             reference = in_lineage[in_lineage.GROUP == "reference"].dropna(subset=[f"lower_{drug}"])
@@ -360,6 +524,7 @@ def main():
                 continue
             reference_fit = fit_censored_normal(reference[f"lower_{drug}"], reference[f"upper_{drug}"])
             if reference_fit is None:
+                not_converged.append(f"{lineage} reference (n = {len(reference):,})")
                 continue
             for label, groups in [("loss of function", lof_groups),
                                   ("substitution", ["Rv0678 substitution"])]:
@@ -368,6 +533,7 @@ def main():
                     continue
                 fit = fit_censored_normal(sub[f"lower_{drug}"], sub[f"upper_{drug}"])
                 if fit is None:
+                    not_converged.append(f"{lineage} {label} (n = {len(sub):,})")
                     continue
                 interval = bootstrap_mu(sub, drug, rng, draws=200)
                 shift = fit["mu"] - reference_fit["mu"]
@@ -384,6 +550,9 @@ def main():
                                              if interval else "n/a"),
                 })
         say(pd.DataFrame(rows).to_string(index=False))
+        if not_converged:
+            say("  Absent from the table above because the fit did not converge: "
+                + "; ".join(not_converged))
 
     say("\n  A shift is in doublings of MIC. A shift of 1.0 means the fitted mean MIC")
     say("  is twice the reference. Intervals come from resampling clusters, so a")

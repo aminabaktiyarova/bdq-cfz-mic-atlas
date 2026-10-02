@@ -67,6 +67,18 @@ def write_report():
     REPORT.write_text("\n".join(_lines) + "\n")
 
 
+def stream(name):
+    """A generator seeded by name.
+
+    Each comparison draws from its own stream, so a collapsed estimate does not
+    depend on which comparisons were computed before it and can be reproduced on
+    its own.
+    """
+    import numpy as np
+
+    return np.random.default_rng([SEED] + [ord(letter) for letter in name])
+
+
 def add_clusters(df, mutations):
     """Attach a cluster key: site, sublineage, and the defining mutation."""
     import pandas as pd
@@ -176,7 +188,7 @@ def collapsed_draws(frame, drug, rng):
     }
 
 
-def compare(frame, drug, label, rng):
+def compare(frame, drug, label):
     import pandas as pd
 
     exposed = frame[frame.EXPOSED]
@@ -204,7 +216,7 @@ def compare(frame, drug, label, rng):
     else:
         say("    cluster-robust:           did not fit")
 
-    collapsed = collapsed_draws(frame, drug, rng)
+    collapsed = collapsed_draws(frame, drug, stream(f"{label} {drug}"))
     if collapsed:
         say(f"    one per cluster:          {collapsed['median']:.1f}  "
             f"({collapsed['low']:.1f} to {collapsed['high']:.1f} across {collapsed['draws']} draws), "
@@ -216,8 +228,6 @@ def compare(frame, drug, label, rng):
 def main():
     import numpy as np
     import pandas as pd
-
-    rng = np.random.default_rng(SEED)
 
     say("=" * 72)
     say("Clonal clustering: effects recomputed with honest sample sizes")
@@ -267,7 +277,7 @@ def main():
             frame["EXPOSED"] = frame.GROUP.isin(lof_groups)
             if int(frame.EXPOSED.sum()) < 5:
                 continue
-            compare(frame, drug, lineage, rng)
+            compare(frame, drug, lineage)
 
     # --------------------------------------------------- 3. substitutions
     say("\n3. The same for Rv0678 substitutions")
@@ -280,7 +290,7 @@ def main():
             frame["EXPOSED"] = frame.GROUP.eq("Rv0678 substitution")
             if int(frame.EXPOSED.sum()) < 5:
                 continue
-            compare(frame, drug, lineage, rng)
+            compare(frame, drug, lineage)
 
     # ------------------------------------------------------- 4. pooled effect
     say("\n4. Pooled across lineages, for reference")
@@ -292,7 +302,7 @@ def main():
         ]:
             frame = intact[intact.GROUP.isin(groups + ["reference"])].copy()
             frame["EXPOSED"] = frame.GROUP.isin(groups)
-            compare(frame, drug, label, rng)
+            compare(frame, drug, label)
 
     say("\n\nHow to read these three numbers together.")
     say("")
