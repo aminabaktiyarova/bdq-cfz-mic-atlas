@@ -65,8 +65,27 @@ Computed from UKMYC_PHENOTYPES: 21,685 samples across 288,904 rows. Per-drug cou
 | VARIANTS.parquet | 1.3 GB |
 | WGS_SAMPLES.parquet | 9.4 MB |
 
-MD5 checksums for every file are shown on the Zenodo record and should be verified after
-download.
+MD5 checksums for every file are published on the Zenodo record. The copies this analysis
+reads were verified against them: all nine match, including MUTATIONS.parquet at
+1,062,006,199 bytes. No file differs from its published checksum at full size.
+
+| File | Bytes | MD5 |
+| --- | --- | --- |
+| DATA_SCHEMA.pdf | 102,717 | `8b11bfbb9255da6dfc1b8b7aede767d0` |
+| DRUG_CODES.csv.gz | 385 | `923d3a193df21698bd6a00f857ab337e` |
+| GENOMES.parquet | 2,604,147 | `ebd82e85f71e36de5da10e776b6afe4e` |
+| MUTATIONS.parquet | 1,062,006,199 | `d5feeeae14304006ba67aaaef84cff03` |
+| PLATE_LAYOUT.parquet | 5,916 | `cb403c7517ec847467b7980cbc3e5389` |
+| RELEASE_NOTES.md | 18,798 | `dfac1d2007ad30bb749f7bb3bcb9645b` |
+| SITES.csv.gz | 1,325 | `c24c882c8988b5af9940232ada27fb60` |
+| UKMYC_PHENOTYPES.parquet | 1,559,813 | `020b6c0af6c05e19610a59f5ef97b832` |
+| WGS_SAMPLES.parquet | 9,410,557 | `ea798f4cfc28525cf394ff9196c93021` |
+
+Four further files downloaded as 92-byte stubs rather than data: DST_MEASUREMENTS.parquet,
+DST_SAMPLES.parquet, UKMYC_GROWTH.parquet and UKMYC_PLATES.parquet. All four carry the same
+checksum as one another, which is the signature of a server response rather than of
+truncated data, and none is read by any module here. They are recorded as absent rather
+than treated as present.
 
 Naming mismatch to watch: the schema calls the drug lookup table DRUG_CODE, the file on
 Zenodo is DRUG_CODES.csv.gz.
@@ -74,8 +93,10 @@ Zenodo is DRUG_CODES.csv.gz.
 ## Differences from v2.1.2 that affect this project
 
 1. Plate images in v3.4.0 were read by TMAS, a convolutional neural network, replacing
-   AMyGDA. This raised the proportion of MICs held at high confidence (at least two of the
-   three measurement methods agreeing) from 79.2% to 88.7%.
+   AMyGDA. The release notes state this raised the proportion of MICs held at high
+   confidence (at least two of the three measurement methods agreeing) from 79.2% to 88.7%.
+   Neither figure reproduces from the table shipped with this version; see the section on
+   the high-confidence proportion below.
 2. All CRyPTIC 96-well plate data was redownloaded from clires2.org, picking up 425
    additional samples from National University of Singapore. Their FASTQ files are not yet
    processed, so these phenotypes have no matching genetics.
@@ -252,7 +273,10 @@ UKMYC_PLATES.TRUST_PHENOTYPES is a plate-level boolean, sitting alongside the im
 columns IM_IMAGE_DOWNLOADED, IM_IMAGE_FILTERED, IM_WELLS_IDENTIFIED, IM_POS1GROWTH,
 IM_POS2GROWTH, IM_POS_AVERAGE and IM_DRUGS_INCONSISTENT_GROWTH.
 
-Under TMAS the HIGH proportion is 88.7%, up from 79.2% under AMyGDA.
+The release notes report the HIGH proportion under TMAS as 88.7%, up from 79.2% under
+AMyGDA. Computed from the table shipped here it is 78.6% to 80.7% depending on the
+denominator, so both figures are recorded as reported rather than confirmed; see the
+section on the high-confidence proportion below.
 
 ## Schema question 8: off-scale and censored MICs
 
