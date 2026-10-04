@@ -105,6 +105,7 @@ python code/heteroresistance.py     # the samples excluded as uncertain
 python code/prediction_metrics.py   # genotype rules as tests for resistance
 python code/benchmark_catalogue.py  # the genotype layer against the WHO catalogue
 python code/wider_gene_set.py       # whether more genes explain the unexplained tier
+python code/hgvs_names.py           # HGVS names for the atlas variants
 ```
 
 `benchmark_catalogue.py` is the one module that reads a catalogue. It needs the
@@ -130,6 +131,7 @@ table is defined in `docs/DATA_DICTIONARY.md`.
 | `prediction_metrics.csv`, `prediction_thresholds.csv` | `code/prediction_metrics.py` |
 | `wider_gene_set.csv` | `code/wider_gene_set.py` |
 | `benchmark_metrics.csv` | `code/benchmark_catalogue.py` |
+| `hgvs_names.csv` | `code/hgvs_names.py` |
 | `gene_vocabulary.csv` | `code/inspect_mutations.py` |
 
 Outputs are regenerated from the CRyPTIC release and are not tracked.

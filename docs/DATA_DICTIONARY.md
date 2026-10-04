@@ -421,3 +421,32 @@ is R, and so on down the precedence R, U, F, S. A grade of U is not a call of
 resistance, so these cells count R against everything else. Predictive values
 depend on how much resistance the collection holds, which here is concentrated
 at one site by design.
+
+---
+
+## outputs/hgvs_names.csv
+
+Written by `code/hgvs_names.py`. One row per variant in the atlas. Join to
+`atlas_evidence.csv` on `gene` and `mutation`.
+
+A translation between two naming conventions. No catalogue is read to produce
+it, and the names it gives are the ones HGVS specifies for the changes GARC
+describes.
+
+| Column | Type | Definition |
+| --- | --- | --- |
+| `gene` | text | Rv0678, pepQ or atpE |
+| `mutation` | text | The variant in GARC, as the rest of this project names it |
+| `hgvs` | text | The same variant in HGVS. Empty where the translation does not reach |
+| `reason` | text | Why there is no name. Empty where there is one |
+
+Every name was translated back to the GARC string it came from and compared,
+and a name that did not survive that would have failed the run rather than
+reaching this table.
+
+An insertion or deletion carries no name here. GARC names an indel by its
+nucleotide change and the catalogues name it by its protein consequence, so
+translating one into the other means deriving the codon at which the reading
+frame first breaks, and the result could not be checked against those
+catalogues because their frameshift entries do not record which nucleotide
+change produced them. A gene deletion has no HGVS variant name at all.

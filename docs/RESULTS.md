@@ -1204,9 +1204,16 @@ is small enough that its own intervals are wide.
    shift, 182 of them resting on a single cluster. A quantitative resource built
    on this dataset is a resource about a handful of variants and a large amount of
    carefully bounded ignorance.
-8. Variant naming here is not interoperable with the WHO catalogue or
-   TB-Profiler, because HGVS normalisation is not implemented, so the per-variant
-   table cannot yet be joined to either by variant name.
+8. Variant naming is interoperable for substitutions and not for indels.
+   `outputs/hgvs_names.csv` carries an HGVS name for 175 of the 217
+   variants in the atlas, every one checked by translating it back to the GARC
+   string it came from. The remaining 42 are 40
+   insertions and deletions and 2 gene deletions. GARC names an indel
+   by its nucleotide change and the catalogues name it by its protein
+   consequence, so the two layers cannot be mapped onto one another without
+   deriving the codon at which the reading frame first breaks, and the result
+   could not be checked against those catalogues, whose frameshift entries do
+   not record which nucleotide change produced them.
 9. The screen over ten further genes tests carriage of any variant in a gene.
    That has little power against a single causal variant inside a polymorphic
    gene, where carriers of the other variants dilute it, so the screen rules
