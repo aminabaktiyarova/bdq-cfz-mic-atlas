@@ -327,3 +327,54 @@ table rather than a result of this project.
 | --- | --- | --- |
 | `GENE` | text | The gene name as the source table spells it |
 | `ROWS` | integer | Rows in MUTATIONS naming that gene, across every sample |
+
+---
+
+## outputs/wider_gene_set.csv
+
+Written by `code/wider_gene_set.py`. One row per candidate gene per drug,
+twenty rows. Every row is computed inside the reference group, which is the
+unexplained tier of a resistant isolate, so the comparison is resistant against
+susceptible among isolates carrying no real major-allele variant in Rv0678,
+pepQ or atpE and nothing uncertain in them.
+
+| Column | Type | Definition |
+| --- | --- | --- |
+| `drug` | text | BDQ or CFZ |
+| `gene` | text | The candidate gene |
+| `isolates` | integer | Reference-group isolates carrying an MIC for this drug |
+| `resistant` | integer | Of those, above the ECOFF |
+| `carriers` | integer | Of those, carrying a real major-allele variant in the gene |
+| `carriers_resistant` | integer | Carriers that are resistant |
+| `carriers_susceptible` | integer | Carriers that are not resistant |
+| `clusters` | integer | Distinct clusters, keyed on site, sublineage and the carried variant |
+| `odds_ratio` | number | Carrying a variant, resistant against susceptible. Zero where no carrier is resistant. Empty where the estimate is not finite |
+| `p_value` | number | Fisher exact, two sided |
+| `q_value` | number | Benjamini-Hochberg over the family of twenty tests |
+| `or_low` | number | Lower bound of the 95% interval, from resampling clusters |
+| `or_high` | number | Upper bound of the same interval |
+| `site_or` | number | Mantel-Haenszel odds ratio holding site constant. Empty where fewer than two strata carry information |
+| `site_low` | number | Lower bound of its 95% interval |
+| `site_high` | number | Upper bound of its 95% interval |
+| `site_strata` | integer | Sites contributing a table with no empty margin |
+| `site_homogeneity_p` | number | Test of equal odds across those sites. Below 0.05 the pooled estimate summarises strata that disagree |
+| `lineage_or` | number | The same estimate holding lineage constant |
+| `lineage_low` | number | Lower bound of its 95% interval |
+| `lineage_high` | number | Upper bound of its 95% interval |
+| `lineage_strata` | integer | Lineages contributing a table with no empty margin |
+| `lineage_homogeneity_p` | number | Test of equal odds across those lineages |
+| `resistant_carrier_groups` | integer | Site and sublineage groups the resistant carriers fall into, a floor on the number of independent events |
+| `largest_group` | integer | Resistant carriers in the largest of those groups |
+| `commonest_variant` | text | The variant most of the resistant carriers hold. Empty where none is resistant |
+| `commonest_variant_count` | integer | Resistant carriers holding it |
+
+The gene set is the union of the genes TB-Profiler's database associates with
+the two drugs, less the three in scope, the modifier gene, and `mmpR5`, which
+is that database's alias for Rv0678. Only the gene names are taken from it: no
+grade or confidence is read, so this table carries no catalogue content.
+
+An odds ratio here is an association inside one collection whose resistance is
+concentrated at one site by design, and the genes are polymorphic, so a crude
+figure is read against the three columns beside it: the interval that resamples
+clusters, the homogeneity test, and the number of groups the resistant carriers
+fall into.

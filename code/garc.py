@@ -41,6 +41,18 @@ for True explicitly rather than relying on falsiness. code/check_parsing.py
 profiles these rows against IS_MINOR, FRS and the indel columns so the reading
 rests on evidence rather than on the token's name.
 
+The form del_minorindel is the gene-level counterpart and is also undefined in
+NOMENCLATURE.md. Across the whole table it occurs on 15,714 rows in 1,137
+genes, every one with IS_MINOR true and IS_NULL false, and MINOR_MUTATION is
+populated on every one of them with a resolved del_<fraction>. INDEL_LENGTH is
+populated on none of them and FRS is absent throughout, which is where it
+differs from the positional form. It is parsed here as a gene deletion whose
+fraction the string does not carry, so DELETED_FRACTION is None and
+SIZE_RESOLVED is False, and the fraction is read from MINOR_MUTATION by a
+caller that needs it. No row of this form appears in the genes this project
+analyses, so it reaches no figure; it is handled because the parser must not
+fail on a gene outside that set.
+
 A fractional gene deletion has no single position and no residues, so POSITION,
 REF_RESIDUE and ALT_RESIDUE are None for it and DELETED_FRACTION carries the
 figure instead.
@@ -69,6 +81,7 @@ NT_SNP = re.compile(rf"^([{NUCLEOTIDES}])(-?\d+)([{NUCLEOTIDES}])$")
 INDEL = re.compile(rf"^(-?\d+)_(ins|del)_([{NUCLEOTIDES}]+|\d+)$")
 MINOR_INDEL = re.compile(r"^(-?\d+)_minorindel$")
 GENE_DELETION = re.compile(r"^del_(\d+(?:\.\d+)?)$")
+MINOR_GENE_DELETION = re.compile(r"^del_minorindel$")
 
 # Fields every parsed mutation carries, so callers can rely on the shape.
 FIELDS = (
@@ -209,6 +222,17 @@ def parse_mutation(mutation, codes_protein):
             INDEL_SIZE=None,
             SIZE_RESOLVED=False,
             IS_FRAMESHIFT=None,
+            IS_REAL_VARIANT=True,
+        )
+        return result
+
+    if MINOR_GENE_DELETION.match(text):
+        result = _blank(True)
+        result.update(
+            KIND="GENE_DELETION",
+            AFFECTS="GENE",
+            DELETED_FRACTION=None,
+            SIZE_RESOLVED=False,
             IS_REAL_VARIANT=True,
         )
         return result

@@ -824,6 +824,89 @@ span 44 combinations with 8 in the largest, and the 527 clofazimine-resistant on
 span 122 combinations with 62 in the largest. That is a coarse floor on the number
 of independent events behind the fraction.
 
+### Ten further genes do not account for it
+
+The obvious objection to the figure above is that it stops at three genes.
+`code/wider_gene_set.py` tests that against ten more: Rv1979c, Rv2983, fbiA,
+fbiB, fbiC, fgd1, lpqB, mmpS5, mtrA and mtrB, the union of the genes
+TB-Profiler's database associates with the two drugs, less the three in scope,
+the modifier gene, and mmpR5, which is that database's alias for Rv0678. Only
+the gene names are taken from it, so no catalogue content enters this analysis
+or the table it writes.
+
+The comparison is made inside the reference group, which is the unexplained
+tier for a resistant isolate: among 14,013 isolates with a
+bedaquiline MIC of which 80 are resistant, and
+14,038 with a clofazimine MIC of
+which 527 are resistant, does
+carrying a real major-allele variant in a candidate gene track resistance.
+
+A coverage count would answer nothing. mtrB carries a variant in
+12,801 of those 14,013 isolates, 91 per
+cent of them, so admitting it would empty the unexplained tier exactly as
+admitting mmpL5 does, and name no cause. The question is association.
+
+Twenty tests were run, ten genes on each of two drugs, and the family is fixed
+at twenty rather than chosen after the results. Intervals resample clusters
+keyed on site, sublineage and the carried variant, as everywhere else here.
+
+| Drug | Gene | Resistant carriers | Susceptible carriers | OR | 95% | p | q |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| BDQ | fbiC | 10 | 634 | 3.00 | 0.82 to 5.63 | 0.0035 | 0.035 |
+| BDQ | Rv1979c | 6 | 1,945 | 0.50 | 0.08 to 1.06 | 0.11 | 0.23 |
+| BDQ | lpqB | 1 | 864 | 0.19 | 0.00 to 0.79 | 0.063 | 0.23 |
+| BDQ | fbiA | 3 | 334 | 1.59 | 0.00 to 4.08 | 0.44 | 0.89 |
+| BDQ | Rv2983 | 0 | 118 | 0.00 | 0.00 to 0.00 | 1 | 1 |
+| BDQ | fbiB | 1 | 322 | 0.54 | 0.00 to 1.30 | 1 | 1 |
+| BDQ | fgd1 | 10 | 1,997 | 0.85 | 0.23 to 2.64 | 0.75 | 1 |
+| BDQ | mmpS5 | 0 | 70 | 0.00 | 0.00 to 0.00 | 1 | 1 |
+| BDQ | mtrA | 0 | 45 | 0.00 | 0.00 to 0.00 | 1 | 1 |
+| BDQ | mtrB | 74 | 12,727 | 1.17 | 0.56 to 4.11 | 0.84 | 1 |
+| CFZ | Rv1979c | 115 | 1,837 | 1.77 | 0.62 to 3.71 | 4.7e-07 | 9.3e-06 |
+| CFZ | lpqB | 21 | 843 | 0.62 | 0.31 to 1.04 | 0.033 | 0.17 |
+| CFZ | mtrB | 467 | 12,357 | 0.73 | 0.49 to 1.04 | 0.027 | 0.17 |
+| CFZ | Rv2983 | 8 | 109 | 1.90 | 0.47 to 3.98 | 0.084 | 0.23 |
+| CFZ | fbiB | 18 | 305 | 1.53 | 0.73 to 2.91 | 0.1 | 0.23 |
+| CFZ | fgd1 | 61 | 1,949 | 0.78 | 0.38 to 1.66 | 0.076 | 0.23 |
+| CFZ | mmpS5 | 1 | 69 | 0.37 | 0.00 to 1.21 | 0.52 | 0.95 |
+| CFZ | fbiA | 13 | 325 | 1.03 | 0.40 to 1.68 | 0.88 | 1 |
+| CFZ | fbiC | 23 | 621 | 0.95 | 0.46 to 1.84 | 0.92 | 1 |
+| CFZ | mtrA | 2 | 43 | 1.19 | 0.00 to 2.57 | 0.69 | 1 |
+
+Two rows reach a q below 0.05 and neither survives inspection.
+
+fbiC against bedaquiline gives a crude odds ratio of 3.00 at
+p = 0.0035, q = 0.035. Its strata agree, homogeneity
+p = 0.45 by site and
+0.69 by lineage, but the site-adjusted estimate is
+1.87 (0.90 to 3.90) and crosses 1,
+as does the interval that resamples clusters,
+0.82 to 5.63. Its 10
+resistant carriers fall into 6 site and
+sublineage groups with 5 in the largest, all of them
+carrying W678G.
+
+Rv1979c against clofazimine is the strongest crude signal in the screen,
+odds ratio 1.77 at p = 4.7e-07, q = 9.3e-06 on
+115 resistant carriers. Held constant by site the
+Mantel-Haenszel estimate falls to 1.27 (1.01 to
+1.59) with homogeneity p = 7.7e-06, and held
+constant by lineage it reads 2.34 (1.85 to
+2.96) with homogeneity p = 5.4e-10. Both
+homogeneity tests reject, so neither pooled figure summarises one quantity. Of
+its 115 resistant carriers,
+61 sit in one of 24 site and
+sublineage groups, the site enriched for resistance by design, and
+63 carry the single variant
+R409Q. Resampling clusters gives 0.62 to
+3.71.
+
+No gene in this set clears a q below 0.05, a cluster-resampled interval above 1,
+and site strata that agree with a lower bound above 1. The residue is therefore
+not an artifact of a gene list that stops at three genes, at least not for these
+ten, and the fraction remains a statement about a named gene set. The full
+screen is in `outputs/wider_gene_set.csv`.
+
 ## Genotype rules as tests for resistance
 
 A shift says how far a variant moves the MIC. It does not say how much of a
@@ -1053,7 +1136,11 @@ is small enough that its own intervals are wide.
 8. Variant naming here is not interoperable with the WHO catalogue or
    TB-Profiler, because HGVS normalisation is not implemented, so the per-variant
    table cannot yet be joined to either by variant name.
-9. Delamanid and linezolid are out of scope. In this cohort delamanid is 61.8%
+9. The screen over ten further genes tests carriage of any variant in a gene.
+   That has little power against a single causal variant inside a polymorphic
+   gene, where carriers of the other variants dilute it, so the screen rules
+   out a gene-level association and not a variant-level one.
+10. Delamanid and linezolid are out of scope. In this cohort delamanid is 61.8%
    left-censored with 43.7% of its resistant isolates at the plate ceiling, and
    linezolid's plates carry one tested concentration above the breakpoint on
    UKMYC5 and two on UKMYC6, with 32.7% of its resistant isolates off the top of

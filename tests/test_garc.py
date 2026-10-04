@@ -174,3 +174,44 @@ def test_unrecognised_string_is_reported_rather_than_guessed():
     result = parse_mutation("something_unexpected", True)
     assert result["PARSED"] is False
     assert result["IS_REAL_VARIANT"] is False
+
+
+def test_a_minor_gene_deletion_parses_with_no_fraction():
+    """del_minorindel is a gene deletion detected in a minority of reads. The
+    string carries no fraction, so DELETED_FRACTION is None and SIZE_RESOLVED
+    says the figure is not known, as it does for the positional form."""
+    result = parse_mutation("del_minorindel", True)
+    assert result["PARSED"]
+    assert result["KIND"] == "GENE_DELETION"
+    assert result["AFFECTS"] == "GENE"
+    assert result["DELETED_FRACTION"] is None
+    assert result["SIZE_RESOLVED"] is False
+    assert result["IS_REAL_VARIANT"]
+
+
+def test_a_minor_gene_deletion_is_not_a_null_or_het_call():
+    """It is a detected change, which is what separates it from a position
+    that could not be read."""
+    result = parse_mutation("del_minorindel", True)
+    assert not result["IS_NULL_CALL"]
+    assert not result["IS_HET_CALL"]
+    assert not result["IS_SYNONYMOUS"]
+
+
+def test_a_fractional_gene_deletion_still_carries_its_fraction():
+    """The new branch must not swallow the documented form."""
+    result = parse_mutation("del_0.55", True)
+    assert result["KIND"] == "GENE_DELETION"
+    assert result["DELETED_FRACTION"] == 0.55
+    assert result["SIZE_RESOLVED"] is True
+    whole = parse_mutation("del_1.0", True)
+    assert whole["DELETED_FRACTION"] == 1.0
+
+
+def test_a_minor_indel_at_a_position_is_unchanged():
+    """The positional form keeps its own reading: an indel, not a gene
+    deletion, with the frameshift flag unknown rather than false."""
+    result = parse_mutation("141_minorindel", True)
+    assert result["KIND"] == "INDEL"
+    assert result["IS_FRAMESHIFT"] is None
+    assert result["SIZE_RESOLVED"] is False

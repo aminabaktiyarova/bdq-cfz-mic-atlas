@@ -15,6 +15,11 @@ tqdm==4.70.0
 # so it needs no downloaded data and completes in about half a minute.
 pytest==9.1.1
 
+# Reads a resistance catalogue in GARC. Used only by code/benchmark_catalogue.py.
+# A pure-Python wheel depending on pandas and ujson alone, both unpinned, so it
+# installs beside the versions above without moving any of them.
+piezo==0.9.2
+
 # Deliberately excluded:
 #
 # lifelines      pins pandas<3.0 and would force a downgrade. Interval-censored
@@ -22,7 +27,5 @@ pytest==9.1.1
 #
 # gnomonicus     pins numpy==1.26.1 and pandas==2.1.1, both capped at CPython 3.12.
 # gumpy          its dependency bio-grumpy declares requires_python <3.13.
-# piezo          These belong in a separate Python 3.12 environment, created only
-# bio-grumpy     if the toolchain is run directly. Mutation names in the CRyPTIC
-#                tables are already GARC-normalised upstream, so this is not
-#                needed for the atlas as scoped.
+# bio-grumpy     Neither is needed here. gnomonicus derives mutations from a VCF,
+#                and the CRyPTIC tables already carry GARC mutation strings.
