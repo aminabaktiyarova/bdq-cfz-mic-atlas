@@ -192,13 +192,42 @@ def test_a_missing_catalogue_says_where_it_comes_from(tmp_path):
         benchmark.load_catalogue(path=tmp_path / "absent.csv")
 
 
-def test_every_output_stays_inside_quarantine():
+def test_the_mapping_is_quarantined_and_the_measurements_are_not():
+    """The per-variant table is the catalogue's own mapping. The confusion
+    cells are measurements of how it performs. Only the first is restricted."""
     benchmark.check_output_paths()
-    for name in ("REPORT", "METRICS", "GRADES"):
-        assert Path("quarantine") in getattr(benchmark, name).parents
+    assert Path("quarantine") in benchmark.GRADES.parents
+    assert Path("outputs") in benchmark.REPORT.parents
+    assert Path("outputs") in benchmark.METRICS.parents
 
 
-def test_an_output_outside_quarantine_is_refused(monkeypatch):
-    monkeypatch.setattr(benchmark, "REPORT", Path("outputs/benchmark_report.txt"))
+def test_the_mapping_leaving_quarantine_is_refused(monkeypatch):
+    monkeypatch.setattr(benchmark, "GRADES", Path("outputs/variant_grades.csv"))
     with pytest.raises(ValueError, match="outside"):
         benchmark.check_output_paths()
+
+
+def test_a_released_file_outside_outputs_is_refused(monkeypatch):
+    monkeypatch.setattr(benchmark, "METRICS", Path("docs/benchmark_metrics.csv"))
+    with pytest.raises(ValueError, match="outside"):
+        benchmark.check_output_paths()
+
+
+def graded_pair():
+    return pd.DataFrame({"GENE": ["geneR"], "MUTATION": ["A1C"],
+                         "CLASS": ["substitution"], "BDQ": ["R"], "CFZ": ["R"]})
+
+
+def test_a_report_of_measurements_alone_names_no_variant():
+    text = "sensitivity 21.1 per cent over 14,972 isolates, 36 true positives"
+    assert benchmark.variants_named_in(text, graded_pair()) == []
+
+
+def test_a_qualified_pairing_in_a_released_report_is_caught():
+    assert benchmark.variants_named_in("geneR@A1C is graded R", graded_pair())
+
+
+def test_a_bare_mutation_in_a_released_report_is_caught():
+    """Dropping the gene prefix still pairs a variant with a grade."""
+    assert benchmark.variants_named_in("the substitution A1C is graded R",
+                                       graded_pair())

@@ -81,7 +81,7 @@ figures. It fails loudly if the local data is a different release.
 
 Each module reads the CRyPTIC tables directly and writes to `outputs/`, except
 `benchmark_catalogue.py`, which also reads a restricted-licence catalogue from
-`quarantine/` and writes everything it produces back there. None reads another
+`quarantine/` and writes its per-variant table back there. None reads another
 module's output, so they can be run in any order, with one exception: `discovery.py` writes `docs/PRE_REGISTRATION.md`, and `validate.py`
 refuses to run until that file is committed and unmodified. Once it is in git,
 `discovery.py` leaves it alone and reports its fresh estimates in its own report,
@@ -107,12 +107,14 @@ python code/benchmark_catalogue.py  # the genotype layer against the WHO catalog
 python code/wider_gene_set.py       # whether more genes explain the unexplained tier
 ```
 
-`benchmark_catalogue.py` is the one module that reads a catalogue. It needs
-the files named in `quarantine/catalogues/PROVENANCE.txt`, which are not
-distributed with this repository, and it writes its report and tables to
-`quarantine/benchmark/` rather than to `outputs/`. The catalogue is licensed
-CC BY-NC-SA 3.0 IGO, whose terms are incompatible with this project's CC BY
-4.0 release, so nothing derived from it is released here.
+`benchmark_catalogue.py` is the one module that reads a catalogue. It needs the
+files named in `quarantine/catalogues/PROVENANCE.txt`, which are not
+distributed with this repository. The catalogue is licensed CC BY-NC-SA 3.0
+IGO, so the module divides what it produces: the per-variant table, which is
+the catalogue's own mapping, is written to `quarantine/benchmark/` and stays
+there, while the confusion cells and the metrics derived from them are
+measurements of the catalogue's performance and are released. `LICENSES.md`
+states the position.
 
 ## Outputs
 
@@ -127,6 +129,7 @@ table is defined in `docs/DATA_DICTIONARY.md`.
 | `heteroresistance_estimates.csv`, `multi_allele_counts.csv` | `code/heteroresistance.py` |
 | `prediction_metrics.csv`, `prediction_thresholds.csv` | `code/prediction_metrics.py` |
 | `wider_gene_set.csv` | `code/wider_gene_set.py` |
+| `benchmark_metrics.csv` | `code/benchmark_catalogue.py` |
 | `gene_vocabulary.csv` | `code/inspect_mutations.py` |
 
 Outputs are regenerated from the CRyPTIC release and are not tracked.

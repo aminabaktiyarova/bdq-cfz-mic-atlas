@@ -43,6 +43,21 @@ with a CC BY 4.0 release, so catalogue content is never merged into this
 project's data. It is used only for benchmarking, and any comparison against it
 is pulled at run time rather than stored here.
 
+What this means for the benchmark in `code/benchmark_catalogue.py` is a
+division. The per-variant table it produces pairs each variant with the grade
+the catalogue assigns it, which is the catalogue's mapping rewritten, so that
+table is written to `quarantine/` and is not released. The confusion cells and
+the sensitivity, specificity and predictive values derived from them are
+measurements of how the catalogue performs on this cohort. No grade for any
+variant can be recovered from a confusion matrix over fourteen thousand
+isolates, and a rule under which reporting such a measurement required the
+catalogue's own licence would make an independent evaluation of that catalogue
+unpublishable by anyone. Those measurements are released under CC BY 4.0 with
+the catalogue cited. The division is enforced in the code: the per-variant
+table must resolve inside `quarantine/`, the released files inside `outputs/`,
+and the released report is searched for every variant the module graded before
+it is written.
+
 This exclusion extends to the CRyPTIC `EFFECTS` and `PREDICTIONS` tables.
 Although CRyPTIC distribute those two tables under CC BY 4.0, their content is
 WHO catalogue classifications applied to CRyPTIC samples, and their `EVIDENCE`

@@ -12,13 +12,26 @@ measured resistance the catalogue's calls recover, and which variants it grades
 differently from what the MIC layer measures.
 
 Licence boundary. The catalogue is CC BY-NC-SA 3.0 IGO, whose non-commercial and
-share-alike terms are incompatible with this project's CC BY 4.0 release. The
-catalogue file is read from quarantine/ and every output of this module is
-written to quarantine/ as well, including the aggregate counts. Whether an
-aggregate agreement count is a reproduction of the catalogue's variant-to-grade
-mapping or a fact about a comparison is unsettled, so nothing here enters
-outputs/ and nothing here is released without that decision being taken first.
-The module raises if an output path falls outside quarantine/.
+share-alike terms are incompatible with this project's CC BY 4.0 release, so the
+catalogue file itself is read from quarantine/ and never redistributed. What
+this module produces divides in two.
+
+The per-variant table pairs each variant with the grade the catalogue assigns
+it. That is the catalogue's own mapping rewritten, so it is written to
+quarantine/ and stays there.
+
+The confusion cells and the metrics derived from them are measurements of how
+the catalogue performs on this cohort. They are facts about a comparison rather
+than a reproduction of the mapping: no grade for any variant can be recovered
+from a confusion matrix over fourteen thousand isolates, and a rule under which
+reporting them required the catalogue's licence would make any independent
+evaluation of that catalogue unpublishable by anyone. They are released under
+CC BY 4.0 with the catalogue cited, and LICENSES.md states the position.
+
+The split is enforced rather than intended. The per-variant table must resolve
+inside quarantine/ and the released files inside outputs/, and the released
+report is searched for every variant the module graded before it is written, so
+a variant name reaching it fails the run rather than the reader.
 
 Catalogue files, obtained from github.com/oxfordmmm/tuberculosis_amr_catalogues
 at commit cf60292082da179f072479270dfa09ba4567b800 and recorded with their
@@ -79,10 +92,10 @@ Intervals resample clusters, through the same functions Section 7.8 uses, so
 the catalogue's sensitivity and specificity sit on the same footing as the
 project's own rules.
 
-Outputs, all inside quarantine/:
-  quarantine/benchmark/benchmark_report.txt
-  quarantine/benchmark/benchmark_metrics.csv
-  quarantine/benchmark/variant_grades.csv
+Outputs:
+  outputs/benchmark_report.txt       released
+  outputs/benchmark_metrics.csv      released
+  quarantine/benchmark/variant_grades.csv   quarantined, the catalogue's mapping
 """
 
 import sys
@@ -99,8 +112,10 @@ QUARANTINE = Path("quarantine")
 CATALOGUES = QUARANTINE / "catalogues"
 OUTPUT_DIR = QUARANTINE / "benchmark"
 
-REPORT = OUTPUT_DIR / "benchmark_report.txt"
-METRICS = OUTPUT_DIR / "benchmark_metrics.csv"
+RELEASED_DIR = Path("outputs")
+
+REPORT = RELEASED_DIR / "benchmark_report.txt"
+METRICS = RELEASED_DIR / "benchmark_metrics.csv"
 GRADES = OUTPUT_DIR / "variant_grades.csv"
 
 CATALOGUE_FILES = {
@@ -122,10 +137,27 @@ def say(text=""):
 
 
 def check_output_paths():
-    """Refuse to write catalogue-derived material outside quarantine/."""
-    for path in (REPORT, METRICS, GRADES):
-        if QUARANTINE not in path.parents:
-            raise ValueError(f"{path} is outside {QUARANTINE}")
+    """Refuse to write the catalogue's own mapping anywhere but quarantine/."""
+    if QUARANTINE not in GRADES.parents:
+        raise ValueError(f"{GRADES} is outside {QUARANTINE}")
+    for path in (REPORT, METRICS):
+        if RELEASED_DIR not in path.parents:
+            raise ValueError(f"{path} is outside {RELEASED_DIR}")
+
+
+def variants_named_in(text, grades):
+    """Which graded variants appear in a text that is about to be released.
+
+    A released artifact may report how the catalogue performs and may not
+    report what it says about any variant. This searches for the forms a
+    pairing could take, the qualified GENE@MUTATION and the mutation string on
+    its own, and the caller treats any hit as fatal.
+    """
+    found = []
+    for gene, mutation in zip(grades.GENE, grades.MUTATION):
+        if f"{gene}@{mutation}" in text or str(mutation) in text:
+            found.append(f"{gene}@{mutation}")
+    return found
 
 
 def load_catalogue(version=PRIMARY, path=None):
@@ -253,7 +285,8 @@ def main():
     say("=" * 72)
     say("The genotype layer against the WHO catalogue, second edition")
     say("=" * 72)
-    say("Catalogue-derived. This report stays in quarantine/.")
+    say("How an external catalogue performs on this cohort. What it grades each")
+    say("variant is its own and is not reported here; see LICENSES.md.")
 
     mutations = cohort.load_mutations()
     status = cohort.build_status(mutations)
@@ -319,9 +352,16 @@ def main():
 
     primary.to_csv(GRADES, index=False)
     table.to_csv(METRICS, index=False)
-    REPORT.write_text("\n".join(_lines) + "\n")
+
     say(f"\nWritten: {REPORT}, {METRICS}, {GRADES}")
-    REPORT.write_text("\n".join(_lines) + "\n")
+    text = "\n".join(_lines) + "\n"
+    leaked = variants_named_in(text, primary)
+    if leaked:
+        raise ValueError(
+            f"the released report names {len(leaked)} graded variant(s), "
+            f"first {leaked[0]}; it carries the catalogue's own mapping and "
+            "must not be written")
+    REPORT.write_text(text)
 
 
 if __name__ == "__main__":

@@ -378,3 +378,46 @@ concentrated at one site by design, and the genes are polymorphic, so a crude
 figure is read against the three columns beside it: the interval that resamples
 clusters, the homogeneity test, and the number of groups the resistant carriers
 fall into.
+
+---
+
+## outputs/benchmark_metrics.csv
+
+Written by `code/benchmark_catalogue.py`. One row per catalogue variant per
+drug, eight rows: two conversions of the WHO catalogue, second edition, each
+with and without the epistasis rule.
+
+These are measurements of how an external catalogue performs on this cohort.
+They carry no grade for any variant, and no grade can be recovered from them.
+The per-variant table the same module produces is the catalogue's own mapping
+and is not released; see `LICENSES.md`.
+
+| Column | Type | Definition |
+| --- | --- | --- |
+| `catalogue` | text | The conversion, and whether the epistasis rule was applied |
+| `drug` | text | BDQ or CFZ |
+| `isolates` | integer | Isolates carrying an MIC for this drug, the denominator |
+| `clusters` | integer | Distinct clusters among them |
+| `resistant` | integer | Of those, above the ECOFF |
+| `true_positive` | integer | Graded R by the catalogue and resistant |
+| `false_positive` | integer | Graded R and not resistant |
+| `false_negative` | integer | Not graded R and resistant |
+| `true_negative` | integer | Not graded R and not resistant |
+| `sensitivity` | fraction | True positives over resistant isolates |
+| `sensitivity_low` | fraction | Lower bound of the 95% interval, from resampling clusters |
+| `sensitivity_high` | fraction | Upper bound of the same interval |
+| `specificity` | fraction | True negatives over isolates that are not resistant |
+| `specificity_low` | fraction | Lower bound of the 95% interval |
+| `specificity_high` | fraction | Upper bound of the same interval |
+| `ppv` | fraction | True positives over isolates graded R |
+| `ppv_low` | fraction | Lower bound of the 95% interval |
+| `ppv_high` | fraction | Upper bound of the same interval |
+| `npv` | fraction | True negatives over isolates not graded R |
+| `npv_low` | fraction | Lower bound of the 95% interval |
+| `npv_high` | fraction | Upper bound of the same interval |
+
+An isolate is graded R when any variant it carries is, U when any is U and none
+is R, and so on down the precedence R, U, F, S. A grade of U is not a call of
+resistance, so these cells count R against everything else. Predictive values
+depend on how much resistance the collection holds, which here is concentrated
+at one site by design.

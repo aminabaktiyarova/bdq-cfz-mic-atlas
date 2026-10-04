@@ -1021,6 +1021,77 @@ clofazimine MICs better than for those just over the breakpoint, where the ECOFF
 figure of 22.2% is measured. That asymmetry between the two drugs is what a
 single cut-off cannot express.
 
+## An external catalogue on the same cohort
+
+Every rule above is this project's own. `code/benchmark_catalogue.py` asks a
+different question: how the WHO catalogue, second edition, performs on these
+isolates. The catalogue is licensed CC BY-NC-SA 3.0 IGO and is not
+redistributed here. What it grades each variant is its own mapping and stays
+out of this repository; what follows is a measurement of how it performs, which
+`LICENSES.md` sets out the position on.
+
+The catalogue is read at run time through piezo, which resolves its wildcard
+rules, so an isolate is graded by what the catalogue would say about the
+variants it carries rather than by a join on variant names. An isolate is R if
+any variant it carries is graded R, else U if any is U, else F, else S, and an
+isolate carrying no graded variant is S. Only real major-allele variants are
+graded, which is how Section 7.8 treats its own rules, so the two are
+comparable. A grade of U is not a call of resistance, so the cells below count
+R against everything else.
+
+CRyPTIC apply a rule under which a loss-of-function mutation in mmpL5 overrides
+a resistance-associated mutation in Rv0678 and the isolate is called
+susceptible. This project's own epistasis finding was retracted, for the reason
+in the clonal clustering section, so adopting the rule silently would import a
+claim this cohort does not support and ignoring it would misrepresent what the
+catalogue does. Both calls are reported.
+
+| Catalogue | Drug | TP | FP | FN | TN | Sensitivity | Specificity |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| v2.1 | BDQ | 36 | 167 | 135 | 14,634 | 21.1 (12.6 to 29.5) | 98.9 (98.1 to 99.4) |
+| v2.1 | CFZ | 54 | 146 | 629 | 14,168 | 7.9 (4.9 to 11.3) | 99.0 (98.2 to 99.4) |
+| v2.1 epistasis | BDQ | 36 | 123 | 135 | 14,678 | 21.1 (13.4 to 29.3) | 99.2 (98.8 to 99.5) |
+| v2.1 epistasis | CFZ | 54 | 102 | 629 | 14,212 | 7.9 (5.0 to 11.3) | 99.3 (99.0 to 99.5) |
+| v2.0 | BDQ | 36 | 167 | 135 | 14,634 | 21.1 (13.5 to 29.3) | 98.9 (98.1 to 99.4) |
+| v2.0 | CFZ | 54 | 146 | 629 | 14,168 | 7.9 (4.7 to 11.5) | 99.0 (98.4 to 99.5) |
+| v2.0 epistasis | BDQ | 36 | 123 | 135 | 14,678 | 21.1 (14.3 to 30.1) | 99.2 (98.9 to 99.5) |
+| v2.0 epistasis | CFZ | 54 | 102 | 629 | 14,212 | 7.9 (4.8 to 11.5) | 99.3 (99.0 to 99.5) |
+
+Grades against the measured phenotype, susceptible then resistant. Bedaquiline:
+R 167 and 36, U 390 and 20, S 14,244
+and 115. Clofazimine: R 146 and 54, U 440
+and 50, S 13,728 and 579. The isolates graded U are the
+ones a catalogue records as carrying something it has not resolved:
+20 bedaquiline-resistant and 50 clofazimine-resistant
+isolates sit there.
+
+Against the rule in the table above, a major-allele variant anywhere in the
+three genes, which catches 34.5 per cent of bedaquiline resistance at 95.7 per
+cent specificity and 15.2 per cent of clofazimine resistance at 95.8, the
+catalogue trades sensitivity for specificity: 21.1 per cent at
+98.9 for bedaquiline and 7.9 at
+99.0 for clofazimine. That is the difference between calling
+every variant in a gene and calling only the variants a catalogue has graded
+resistant.
+
+The epistasis rule removes 44 false
+positives on bedaquiline and 44 on
+clofazimine and costs no true positives, so on this cohort it strictly improves
+the catalogue. The isolates it removes are largely one clonal group, the same
+group whose zero resistant isolates were a retracted finding here, so the
+improvement is not independent evidence that the mechanism operates.
+
+Both conversions of the catalogue give identical cells. The later one adds rows
+for minor alleles, which this comparison does not grade, so the difference
+between them cannot show here.
+
+What this is not: the catalogue was built to be applied to clinical isolates
+under a workflow this project does not reproduce, and this collection's
+resistance is concentrated at one site by design, so the predictive values
+transfer to no other collection. The comparison says what the catalogue's
+grades recover in this cohort, and nothing about how it performs where it is
+used.
+
 ## The pre-registered test
 
 Everything above is an estimate with an interval. One comparison was specified in
