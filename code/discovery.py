@@ -50,6 +50,7 @@ Outputs:
   docs/PRE_REGISTRATION.md
 """
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -517,16 +518,45 @@ def main():
 
         say(pd.DataFrame(power_rows).to_string(index=False))
 
-    write_prereg(prereg_rows, df)
+    written = write_prereg(prereg_rows)
     write_report()
     say(f"\nReport written to {REPORT}")
-    say(f"Pre-registration written to {PREREG}")
-    say("\nCommit PRE_REGISTRATION.md and push it before running code/validate.py.")
-    say("The commit timestamp is what makes the ordering verifiable.")
+    if written:
+        say(f"Pre-registration written to {PREREG}")
+        say("\nCommit PRE_REGISTRATION.md and push it before running code/validate.py.")
+        say("The commit timestamp is what makes the ordering verifiable.")
 
 
-def write_prereg(rows, df):
-    """Write the numbered predictions as a committable document."""
+def prereg_is_registered():
+    """Whether git tracks the pre-registration, staged or committed.
+
+    A file on disk is not a registered document: the predictions in it are fixed
+    by being in git, where their timestamp can be checked. Staged counts as
+    registered here, because a document waiting to be committed is no more ours
+    to rewrite than one already in a commit.
+    """
+    result = subprocess.run(["git", "ls-files", "--error-unmatch", str(PREREG)],
+                            capture_output=True, text=True, check=False)
+    return result.returncode == 0
+
+
+def write_prereg(rows):
+    """Write the numbered predictions as a committable document.
+
+    A committed pre-registration is what the held-out test is accountable to, so
+    rewriting it would put predictions made after the result was known where
+    predictions made before it used to be. Once it is committed this leaves it
+    alone and reports the fresh estimates in the discovery report instead.
+    Returns whether the document was written.
+    """
+    if prereg_is_registered():
+        say("")
+        say(f"{PREREG} is in git, so it is not rewritten. Its predictions were")
+        say("registered before the held-out test ran, and a document rewritten now")
+        say("would carry predictions made after the result was known. The estimates")
+        say("above stand as this run's record of them.")
+        return False
+
     lines = [
         "# Pre-registration: predictions to be tested on the held-out half",
         "",
@@ -709,6 +739,7 @@ def write_prereg(rows, df):
     ]
     PREREG.parent.mkdir(parents=True, exist_ok=True)
     PREREG.write_text("\n".join(lines) + "\n")
+    return True
 
 
 if __name__ == "__main__":

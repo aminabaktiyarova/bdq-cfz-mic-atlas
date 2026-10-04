@@ -186,15 +186,11 @@ def tier_counts(frame, drug, high_quality=False):
 def coarse_events(frame, drug, tier="unexplained"):
     """Site and sublineage combinations spanned by one tier's resistant isolates.
 
-    value_counts leaves the order of equal counts to the implementation, and
-    that order differs between pandas versions, so ties are ordered by key and
-    the report is reproducible across environments.
+    The count of isolates in the tier is returned beside the combinations.
     """
     subset = frame[frame[f"resistant_{drug}"] & frame.TIER.eq(tier)]
     combinations = subset.SITEID.astype(str) + " | " + subset.SUBLINEAGE.astype(str)
-    counts = combinations.value_counts().sort_index().sort_values(
-        ascending=False, kind="stable")
-    return len(subset), counts
+    return len(subset), cohort.ranked_counts(combinations)
 
 
 def structural_counts(frame, mutations, genes, drug, high_quality=False):

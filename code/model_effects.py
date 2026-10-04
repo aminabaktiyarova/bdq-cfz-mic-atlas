@@ -137,7 +137,7 @@ def main():
         )
         say(f"  distinct mutation-and-sublineage combinations: {combination.nunique()}")
         say("\n  most frequent combinations:")
-        say(combination.value_counts().head(8).to_string())
+        say(cohort.ranked_counts(combination, 8).to_string())
         say("\n  by site:")
         by_site = detail.SITEID.value_counts()
         if sites is not None:

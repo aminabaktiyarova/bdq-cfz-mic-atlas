@@ -31,6 +31,12 @@ analyses:
   deviation, over the same censoring intervals, so the slope is in doublings of
   MIC per unit of read fraction.
 
+  More than one allele. A sample carrying two minor alleles at the subject gene
+  cannot attribute its MIC to either, so eligible_samples excludes it. Nothing
+  about such a sample is wild type and no major allele explains it, so the group
+  is measured on its own: what it holds, how much resistance it carries, and its
+  MIC shift from the same joint fit.
+
   Site held constant. The minor-allele groups are small and unevenly spread
   across the collection sites, and the sites differ in mean MIC, so a group
   mean confounds the two. Every group is refitted jointly with the reference
@@ -52,6 +58,7 @@ hypotheses.
 Outputs:
   outputs/heteroresistance_report.txt
   outputs/heteroresistance_estimates.csv
+  outputs/multi_allele_counts.csv
 
 The adjusted fit carries the module's running cost. It refits a regression of
 sixteen columns over fourteen thousand rows once per bootstrap draw, per drug.
@@ -70,6 +77,7 @@ from mic_model import (concentration_series, fit_censored_linear,  # noqa: E402
 
 REPORT = Path("outputs/heteroresistance_report.txt")
 ESTIMATES = Path("outputs/heteroresistance_estimates.csv")
+MULTI = Path("outputs/multi_allele_counts.csv")
 
 SUBJECT_GENE = "Rv0678"
 BOOTSTRAPS = 400
@@ -87,7 +95,7 @@ RAW_COLUMNS = [
     "NUCLEOTIDE_NUMBER", "NUCLEOTIDE_INDEX", "CODES_PROTEIN", "INDEL_LENGTH",
     "INDEL_NUCLEOTIDES", "AMINO_ACID_NUMBER", "AMINO_ACID_SEQUENCE",
     "NUMBER_NUCLEOTIDE_CHANGES", "IS_NULL", "IS_MINOR", "MINOR_MUTATION",
-    "MINOR_READS", "COVERAGE", "FRS",
+    "MINOR_READS", "COVERAGE", "FRS", cohort.GENE_CODES,
 ]
 
 _lines = []
@@ -166,6 +174,80 @@ def resolve(mutations, keep):
     return parsed, unparsed
 
 
+def multi_allele_samples(mutations):
+    """Samples whose only finding across the three genes is more than one minor
+    allele at the subject gene.
+
+    eligible_samples admits exactly one, because a sample carrying two cannot
+    attribute its MIC to either. The group is still worth measuring: nothing
+    about it is wild type, and no major allele explains it.
+    """
+    target = mutations[mutations.GENE.isin(cohort.BDQ_GENES)]
+    major = set(target[target.REAL_MAJOR].UNIQUEID)
+    nulls = set(target[target.IS_NULL_CALL].UNIQUEID)
+    minor = target[target.IS_HET_CALL | target.IS_MINOR]
+    elsewhere = set(minor[~minor.GENE.eq(SUBJECT_GENE)].UNIQUEID)
+    subject = minor[minor.GENE.eq(SUBJECT_GENE)]
+    counts = subject.groupby("UNIQUEID", observed=True).size()
+    keep = {unique_id for unique_id, count in counts.items()
+            if count > 1 and unique_id not in major and unique_id not in nulls
+            and unique_id not in elsewhere}
+    return keep, int((counts > 1).sum())
+
+
+def multi_allele_profile(mutations, keep):
+    """Per sample, how many minor alleles it carries at the subject gene, how
+    many distinct positions they sit at, how many are loss of function, and
+    what their read fractions sum to."""
+    import pandas as pd
+
+    columns = ["alleles", "positions", "loss_of_function", "read_fraction_sum",
+               "read_fraction_low", "read_fraction_high"]
+    minor = mutations[mutations.GENE.eq(SUBJECT_GENE)
+                      & (mutations.IS_HET_CALL | mutations.IS_MINOR)
+                      & mutations.UNIQUEID.isin(keep)
+                      & mutations.MINOR_MUTATION.notna()]
+    if minor.empty:
+        # A cohort with no multi-allele carrier is a cohort, not an error, and
+        # the parser returns none of the columns to classify when given no rows.
+        empty = pd.DataFrame(columns=columns, index=pd.Index([], name="UNIQUEID"))
+        return empty, 0
+    raw = minor[[column for column in RAW_COLUMNS if column in minor.columns]].copy()
+    raw["MUTATION"] = raw.MINOR_MUTATION.astype(str)
+    parsed = cohort.classify(parse_frame(raw))
+    unparsed = int((~parsed.PARSED).sum())
+    parsed = parsed[parsed.PARSED]
+    parsed = parsed.assign(LOF=parsed.CLASS.isin(cohort.LOF_CLASSES))
+    profile = parsed.groupby("UNIQUEID", observed=True).agg(
+        alleles=("MUTATION", "size"),
+        positions=("POSITION", "nunique"),
+        loss_of_function=("LOF", "sum"),
+        read_fraction_sum=("FRS", "sum"),
+        read_fraction_low=("FRS", "min"),
+        read_fraction_high=("FRS", "max"))
+    return profile, unparsed
+
+
+def multi_allele_rows(frame, profile, drug):
+    """What the group holds, and how its resistance compares with the reference
+    group. Counts only; the MIC shift comes from the joint fit."""
+    carriers = frame[frame.MULTI_ALLELES.notna()].dropna(subset=[f"lower_{drug}"])
+    reference = frame[frame.GROUP.eq("reference")].dropna(subset=[f"lower_{drug}"])
+    rows = []
+    for label, subset in (("all", carriers),
+                          ("two alleles", carriers[carriers.MULTI_ALLELES.eq(2)]),
+                          ("three or more", carriers[carriers.MULTI_ALLELES.ge(3)])):
+        resistant = int(subset[f"resistant_{drug}"].sum())
+        rows.append({
+            "drug": drug, "subset": label, "isolates": len(subset),
+            "clusters": subset.CLUSTER.nunique(),
+            "resistant": resistant,
+            "percent": round(100 * resistant / len(subset), 1) if len(subset) else None,
+            "reference_percent": round(
+                100 * reference[f"resistant_{drug}"].mean(), 2)})
+    return rows
+
+
 def fit_slope(lower, upper, fraction):
     """Mean log2 MIC as a line in the read fraction, with a common standard
     deviation, over the censoring intervals. The slope is in doublings of MIC
@@ -230,6 +312,10 @@ def prepare(mutations, status):
 
     keep, multiple = eligible_samples(mutations)
     resolved, unparsed = resolve(mutations, keep)
+    several, _ = multi_allele_samples(mutations)
+    profile, multi_unparsed = multi_allele_profile(mutations, several)
+    frame["MULTI_ALLELES"] = profile.alleles.reindex(frame.index)
+    frame["MULTI_FRS_SUM"] = profile.read_fraction_sum.reindex(frame.index)
     frame["MINOR_GROUP"] = resolved.MINOR_GROUP.reindex(frame.index)
     frame["MINOR_FORM"] = resolved.MUTATION.reindex(frame.index)
     frame["MINOR_FRS"] = resolved.FRS.reindex(frame.index)
@@ -240,7 +326,9 @@ def prepare(mutations, status):
     resolved_key = (frame.SITEID.astype(str) + " | " + frame.SUBLINEAGE.astype(str)
                     + " | " + frame.MINOR_FORM.astype(str))
     frame["CLUSTER"] = resolved_key.where(frame.MINOR_FORM.notna(), frame.CLUSTER)
-    return frame, {"eligible": len(keep), "multiple": multiple, "unparsed": unparsed}
+    return frame, {"eligible": len(keep), "multiple": multiple, "unparsed": unparsed,
+                   "several": len(several), "several_unparsed": multi_unparsed,
+                   "profile": profile}
 
 
 def shift_rows(frame, drug, rng):
@@ -304,6 +392,7 @@ def group_masks(frame):
     masks["major loss of function"] = frame.GROUP.isin(
         [f"{SUBJECT_GENE} {class_}" for class_ in cohort.LOF_CLASSES])
     masks["major substitution"] = frame.GROUP.eq(f"{SUBJECT_GENE} substitution")
+    masks["minor, two or more alleles"] = frame.MULTI_ALLELES.notna()
     return masks
 
 
@@ -536,6 +625,54 @@ def main():
 
     adjusted_table = pd.DataFrame(adjusted)
     say("\n" + "=" * 72)
+    say(f"Samples carrying more than one minor allele at {SUBJECT_GENE}")
+    say("=" * 72)
+    say("")
+    say(f"Across every genome, {counts['multiple']:,} samples carry more than one "
+        f"minor allele at {SUBJECT_GENE}.")
+    say(f"{counts['several']:,} of those carry nothing else in the three genes, and "
+        f"{int(frame.MULTI_ALLELES.notna().sum()):,} of")
+    say("those carry a MIC. Resolved forms that did not parse: "
+        f"{counts['several_unparsed']:,}.")
+    profile = counts["profile"].reindex(
+        frame.index[frame.MULTI_ALLELES.notna()]).dropna(how="all")
+    say("")
+    say("Per sample, among those carrying a MIC:")
+    say("")
+    say(profile.describe().round(3).to_string())
+    say("")
+    say("Alleles per sample: "
+        + ", ".join(f"{int(k)} in {v}" for k, v in
+                    profile.alleles.value_counts().sort_index().items()) + ".")
+    say(f"Samples whose alleles all sit at distinct positions: "
+        f"{int((profile.positions == profile.alleles).sum())} of {len(profile)}.")
+    say(f"Samples carrying at least one loss of function: "
+        f"{int((profile.loss_of_function > 0).sum())}; carrying nothing else: "
+        f"{int((profile.loss_of_function == profile.alleles).sum())}.")
+    say("")
+    say("The read fractions are per-position ratios, so summing them across")
+    say("positions is not bounded by one and the sum is not a wild-type")
+    say(f"complement: {int((profile.read_fraction_sum > 1.0).sum())} of "
+        f"{len(profile)} samples sum above 1.0, to a maximum of "
+        f"{profile.read_fraction_sum.max():.3f}.")
+    pairs = profile[profile.alleles == 2]
+    if len(pairs):
+        difference = (pairs.read_fraction_high - pairs.read_fraction_low)
+        say(f"Among the {len(pairs)} two-allele samples the two fractions differ by a")
+        say(f"median of {difference.median():.3f}, and by more than 0.3 in "
+            f"{int((difference > 0.3).sum())} of them, so the")
+        say("alleles are mostly not at equal shares.")
+
+    multi = []
+    for drug in cohort.DRUGS:
+        multi.extend(multi_allele_rows(frame, counts["profile"], drug))
+    multi_table = pd.DataFrame(multi)
+    say("")
+    say("Resistance against the reference group, in percent:")
+    say("")
+    say(multi_table.to_string(index=False))
+
+    say("\n" + "=" * 72)
     say("The same shifts with site held constant")
     say("=" * 72)
     say("")
@@ -556,12 +693,15 @@ def main():
     combined = pd.concat([shift_table.assign(estimate="shift"),
                           slope_table.assign(estimate="slope"),
                           adjusted_table], ignore_index=True)
+    MULTI.parent.mkdir(parents=True, exist_ok=True)
+    multi_table.to_csv(MULTI, index=False)
     columns = ["drug", "estimate", "group", "isolates", "clusters", "resistant",
                "reference_mean", "shift", "shift_low", "shift_high",
                "slope", "slope_low", "slope_high", "withheld"]
     combined.reindex(columns=columns).to_csv(ESTIMATES, index=False)
     REPORT.write_text("\n".join(_lines) + "\n")
     print(f"\nEstimates written to {ESTIMATES}")
+    print(f"Multi-allele counts written to {MULTI}")
     print(f"Report written to {REPORT}")
 
 

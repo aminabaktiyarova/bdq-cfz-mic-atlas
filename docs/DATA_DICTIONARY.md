@@ -24,11 +24,26 @@ allele in any of the three. A sample carrying two variants cannot attribute its
 MIC to either, and a sample whose gene could not be read can be asserted neither
 to carry the variant nor to lack it. mmpL5 is never the subject of a row.
 
+A large deletion is written twice in the source table, once as the fraction of
+the gene absent and once as the sequence removed, and the two rows are one
+event. The fraction row is the variant here and the sequence row is dropped, so
+a sample whose only finding is such a deletion counts as a solo isolate.
+`docs/PROVENANCE.md`, schema question 9, has the counts.
+
+The class of a variant is decided in the order the column lists: a gene deletion
+first, then a frameshift, then a stop codon, then a change confined to the
+promoter, then an indel that leaves the reading frame intact, and a substitution
+otherwise. A promoter has no reading frame, so an insertion or deletion inside
+one is classed as a promoter change rather than as an in-frame indel. A deletion
+written from a promoter position reaches the coding sequence when it is long
+enough, and then the bases it removes from the gene decide whether it shifts the
+frame.
+
 | Column | Type | Definition |
 | --- | --- | --- |
 | `gene` | text | Rv0678, pepQ or atpE |
-| `mutation` | text | The variant, in the GARC grammar the CRyPTIC tables use |
-| `class` | text | gene deletion, frameshift, stop codon, in-frame indel, promoter, or substitution |
+| `mutation` | text | The variant, in the GARC grammar the CRyPTIC tables use. A gene deletion is written `del_` and the fraction of the gene absent, so `del_0.81` is 81 per cent deleted |
+| `class` | text | gene deletion, frameshift, stop codon, promoter, in-frame indel, or substitution, decided in that order |
 | `isolates` | integer | Solo isolates carrying this variant that have both a genome and a UKMYC MIC for at least one of the two drugs |
 | `clusters` | integer | Distinct combinations of site, sublineage and this mutation among those isolates. The independent evidence behind the row |
 | `sites` | integer | Distinct collection sites among those isolates |
@@ -149,6 +164,33 @@ shows how much of the figure is the choice of genes.
 
 ---
 
+## outputs/multi_allele_counts.csv
+
+Written by `code/heteroresistance.py`. Resistance in the samples carrying more
+than one detected minor allele at Rv0678 and nothing else in the three genes.
+One row per drug and subset.
+
+| Column | Type | Definition |
+| --- | --- | --- |
+| `drug` | text | BDQ or CFZ |
+| `subset` | text | `all`, `two alleles`, or `three or more`. The last two partition the first |
+| `isolates` | integer | Samples in the subset carrying a placeable MIC for this drug |
+| `clusters` | integer | Distinct combinations of site, sublineage and the defining mutation. Equal to `isolates` throughout, since these samples carry no defining major-allele mutation to share |
+| `resistant` | integer | Of those, above the ECOFF |
+| `percent` | percent | `resistant` over `isolates` |
+| `reference_percent` | percent | The same rate in the reference group, over the reference samples carrying a placeable MIC for this drug, which is 14,013 for bedaquiline and 14,038 for clofazimine rather than all 14,187 |
+
+A sample carrying two minor alleles at Rv0678 cannot attribute its MIC to either,
+which is why `heteroresistance_estimates.csv` excludes it from the per-class
+estimates. It is still a sample with no wild-type assertion available at the gene
+and no major allele to explain it, so the group is counted here and carries its
+own column in the joint and site-adjusted fits, under the group name
+`minor, two or more alleles`.
+
+The MIC shift for the group is in `heteroresistance_estimates.csv`, not here.
+
+---
+
 ## outputs/heteroresistance_estimates.csv
 
 Written by `code/heteroresistance.py`. Four kinds of estimate about the samples
@@ -183,6 +225,60 @@ site to that same regression. The two joint rows are fitted on the same rows,
 so the distance between them is the site adjustment. A site with fewer than 30
 isolates is pooled into one `other` level, and a group with fewer than 12 is
 dropped from the joint fits rather than left in them as reference.
+
+---
+
+## outputs/prediction_thresholds.csv
+
+Written by `code/prediction_metrics.py`. The same four rules as
+`prediction_metrics.csv`, evaluated at every concentration both plate designs
+tested rather than at the ECOFF alone. One row per drug, rule and cut-off.
+
+| Column | Type | Definition |
+| --- | --- | --- |
+| `drug` | text | BDQ or CFZ |
+| `rule` | text | The genotype rule, as in `prediction_metrics.csv` |
+| `threshold_mg_L` | mg/L | The cut-off, a concentration tested on every plate design for this drug |
+| `threshold_log2` | log2 mg/L | The same cut-off in log2 units |
+| `is_ecoff` | boolean | True on the cut-off the ECOFF sits at, whose row reproduces `prediction_metrics.csv` |
+| `isolates` | integer | Isolates whose position relative to the cut-off is determinate |
+| `indeterminate` | integer | Isolates the plate cannot place either side of the cut-off. Zero at every cut-off in this table, by the choice of cut-offs |
+| `clusters` | integer | Distinct combinations of site, sublineage and the defining mutation among those isolates |
+| `above_threshold` | integer | Of those, whose MIC interval lies above the cut-off |
+| `true_positive` | integer | Called by the rule and above the cut-off |
+| `false_positive` | integer | Called by the rule and at or below the cut-off |
+| `false_negative` | integer | Not called and above the cut-off |
+| `true_negative` | integer | Not called and at or below the cut-off |
+| `sensitivity` | fraction | True positives over isolates above the cut-off |
+| `sensitivity_low` | fraction | Lower bound of the 95% interval, from resampling clusters |
+| `sensitivity_high` | fraction | Upper bound of the same interval |
+| `specificity` | fraction | True negatives over isolates at or below the cut-off |
+| `specificity_low` | fraction | Lower bound of the 95% interval |
+| `specificity_high` | fraction | Upper bound of the same interval |
+| `ppv` | fraction | True positives over isolates the rule calls |
+| `ppv_low` | fraction | Lower bound of the 95% interval |
+| `ppv_high` | fraction | Upper bound of the same interval |
+| `npv` | fraction | True negatives over isolates the rule does not call |
+| `npv_low` | fraction | Lower bound of the 95% interval |
+| `npv_high` | fraction | Upper bound of the same interval |
+
+A cut-off is usable only where every isolate's position relative to it is
+determinate. Below the highest of the designs' lowest rungs a left-censored
+reading sits on neither side, and above the lowest of the designs' highest rungs
+a right-censored reading sits on neither side. A concentration that is a rung on
+every design is inside both bounds, which is why the cut-offs are the shared
+rungs: 0.015 to 1 mg/L for bedaquiline, seven of them, and 0.06 to 2 mg/L for
+clofazimine, six.
+
+Position is read from the censoring interval rather than the reported number. An
+interval lies above the cut-off when its lower bound reaches it and at or below
+when its upper bound does not exceed it. On the real cohort that rule and
+CRyPTIC's own `BINARY_PHENOTYPE` agree at the ECOFF on all 14,972 bedaquiline and
+14,997 clofazimine isolates, with no disagreement and nothing indeterminate.
+
+Predictive values depend on how much resistance the collection holds, and
+resistance here is concentrated at one site by design, so they describe this
+collection and transfer to no other.
 
 ---
 

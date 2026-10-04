@@ -64,6 +64,18 @@ def say(text=""):
     _lines.append(text)
 
 
+def stream(name):
+    """A generator seeded by name.
+
+    Each estimate draws from its own stream, so its interval does not depend on
+    which other estimates were computed before it and can be reproduced on its
+    own.
+    """
+    import numpy as np
+
+    return np.random.default_rng([SEED] + [ord(letter) for letter in name])
+
+
 def write_report():
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text("\n".join(_lines) + "\n")
@@ -379,6 +391,113 @@ def fit_censored_linear(lower, upper, design):
     return {"beta": result.x[:-1], "sigma": float(np.exp(result.x[-1]))}
 
 
+PLANTED = [(-5.0, 1.0), (-6.5, 1.0), (-7.5, 1.2), (-2.0, 1.5), (-4.0, 0.8)]
+
+
+def simulate_reports(mu, sd, concentrations, rng, draws=4000):
+    """Draw log2 MICs from a known distribution and report them as a plate would.
+
+    A plate reports the lowest tested concentration that inhibited growth, so a
+    draw at or below the first well comes back censored at that well and one
+    above the last comes back censored above it.
+    """
+    import numpy as np
+
+    steps = np.log2(np.asarray(concentrations))
+    reported = []
+    for value in rng.normal(mu, sd, draws):
+        index = int(np.searchsorted(steps, value))
+        if index == 0:
+            reported.append(f"<={concentrations[0]}")
+        elif index >= len(steps):
+            reported.append(f">{concentrations[-1]}")
+        else:
+            reported.append(f"{concentrations[index]}")
+    return reported
+
+
+def validate_estimator(concentrations, rng, draws=4000):
+    """Recover each planted distribution from reports censored onto a real ladder.
+
+    The naive median of the reported values is carried beside the fit, because
+    the gap between the two is what the estimator exists to remove.
+    """
+    import numpy as np
+
+    rows = []
+    for mu, sd in PLANTED:
+        reported = simulate_reports(mu, sd, concentrations, rng, draws)
+        bounds = [mic_bounds(value, concentrations) for value in reported]
+        fit = fit_censored_normal([bound[0] for bound in bounds],
+                                  [bound[1] for bound in bounds])
+        naive = float(np.median([np.log2(float(value.lstrip("<").lstrip("=").lstrip(">")))
+                                 for value in reported]))
+        left = sum(1 for value in reported if value.startswith("<="))
+        rows.append({
+            "true mean": mu,
+            "fitted mean": round(fit["mu"], 2) if fit else None,
+            "true sd": sd,
+            "fitted sd": round(fit["sigma"], 2) if fit else None,
+            "naive median": round(naive, 2),
+            "left-censored %": round(100 * left / draws, 1),
+        })
+    return rows
+
+
+SITE_MINIMUM = 100  # a fit on fewer placeable intervals is not a site effect
+
+
+def excluded_sensitivity(frame, drug, minimum=SITE_MINIMUM):
+    """How far the fitted reference mean could move if the excluded rows differed.
+
+    A row carrying no MIC is excluded from every fit, so it can only act through
+    the value it would have had. The movement is the excluded fraction times the
+    gap between that value and the fitted mean, and the widest gap between a
+    site's fitted mean and the whole group's is what a gap of that size looks
+    like in this collection.
+    """
+    reference = frame[frame.GROUP.eq("reference")]
+    fitted = reference.dropna(subset=[f"lower_{drug}"])
+    whole = fit_censored_normal(fitted[f"lower_{drug}"], fitted[f"upper_{drug}"])
+    if whole is None:
+        return None
+    widest, where = 0.0, None
+    for site, chunk in fitted.groupby("SITEID", observed=True):
+        if len(chunk) < minimum:
+            continue
+        fit = fit_censored_normal(chunk[f"lower_{drug}"], chunk[f"upper_{drug}"])
+        if fit and abs(fit["mu"] - whole["mu"]) > widest:
+            widest, where = abs(fit["mu"] - whole["mu"]), site
+    excluded = len(reference) - len(fitted)
+    share = excluded / len(reference)
+    return {"drug": drug, "reference": len(reference), "fitted": len(fitted),
+            "excluded": excluded, "fitted mean": round(whole["mu"], 3),
+            "widest site gap": round(widest, 3), "at site": where,
+            "movement at that gap": round(share * widest, 3),
+            "movement at 3 doublings": round(share * 3.0, 3)}
+
+
+def tiny_intervals(frame, drug, floor=1e-08):
+    """Observed intervals whose probability mass under the fitted model is tiny.
+
+    Below this floor the mass cannot be formed as a difference of two cumulative
+    distribution functions without losing every digit of it, which is why the
+    likelihood is evaluated in log space.
+    """
+    import numpy as np
+
+    fitted = frame[frame.GROUP.eq("reference")].dropna(subset=[f"lower_{drug}"])
+    fit = fit_censored_normal(fitted[f"lower_{drug}"], fitted[f"upper_{drug}"])
+    if fit is None:
+        return None
+    low = (fitted[f"lower_{drug}"].to_numpy() - fit["mu"]) / fit["sigma"]
+    high = (fitted[f"upper_{drug}"].to_numpy() - fit["mu"]) / fit["sigma"]
+    mass = np.exp(log_interval_mass(low, high))
+    return {"drug": drug, "intervals": len(mass), "floor": floor,
+            "below the floor": int((mass < floor).sum()),
+            "smallest": float(mass.min())}
+
+
 def bootstrap_mu(frame, drug, rng, draws=BOOTSTRAPS):
     """Resample clusters with replacement and refit, returning the spread of mu."""
     import numpy as np
@@ -408,8 +527,6 @@ def main():
     import numpy as np
     import pandas as pd
 
-    rng = np.random.default_rng(SEED)
-
     say("=" * 72)
     say("Interval-censored MIC estimation")
     say("=" * 72)
@@ -434,6 +551,18 @@ def main():
                 say(f"  {design} {drug}: {concentrations[0]} to {concentrations[-1]}, "
                     f"{len(concentrations)} concentrations")
 
+    say("\n" + "=" * 72)
+    say("Validation against planted parameters")
+    say("=" * 72)
+    say("")
+    say("Each row simulates from a known distribution, censors the draws onto the")
+    say("real UKMYC6 bedaquiline ladder, and refits. The naive median beside the")
+    say("fit is the median of the reported values.")
+    say("")
+    say(pd.DataFrame(validate_estimator(series[("UKMYC6", "BDQ")],
+                                        stream("planted parameters"))
+                     ).to_string(index=False))
+
     df = add_clusters(cohort.assemble(), cohort.load_mutations())
     say(f"\nSamples: {len(df):,}")
 
@@ -454,6 +583,23 @@ def main():
             die(f"{len(off_series)} {drug} MICs carry a value that is not on the "
                 f"tested series, so the series does not describe the data. "
                 f"Examples: {sorted(set(off_series))[:10]}")
+
+    # ------------------------------- what the excluded rows and the tails do
+    say("\n" + "=" * 72)
+    say("The excluded rows, and where the interval mass underflows")
+    say("=" * 72)
+    say("")
+    say("An excluded row acts only through the value it would have had, so the")
+    say("movement it can cause is its share of the group times the gap between")
+    say("that value and the fitted mean. The widest gap between a site's fitted")
+    say(f"mean and the whole group's is shown beside it, over sites carrying at")
+    say(f"least {SITE_MINIMUM} placeable intervals.")
+    say("")
+    say(pd.DataFrame([excluded_sensitivity(df, drug) for drug in cohort.DRUGS]
+                     ).to_string(index=False))
+    say("")
+    say(pd.DataFrame([tiny_intervals(df, drug) for drug in cohort.DRUGS]
+                     ).to_string(index=False))
 
     # ------------------------------------------------------ fit each group
     say("\n" + "=" * 72)
@@ -486,7 +632,7 @@ def main():
             if fit is None:
                 not_converged.append(f"{group} (n = {len(sub):,})")
                 continue
-            interval = bootstrap_mu(sub, drug, rng)
+            interval = bootstrap_mu(sub, drug, stream(f"{drug} {group}"))
             shift = fit["mu"] - reference_fit["mu"]
             rows.append({
                 "group": group,
@@ -535,7 +681,8 @@ def main():
                 if fit is None:
                     not_converged.append(f"{lineage} {label} (n = {len(sub):,})")
                     continue
-                interval = bootstrap_mu(sub, drug, rng, draws=200)
+                interval = bootstrap_mu(
+                    sub, drug, stream(f"{drug} {lineage} {label}"), draws=200)
                 shift = fit["mu"] - reference_fit["mu"]
                 rows.append({
                     "lineage": lineage,

@@ -157,7 +157,8 @@ def minor_row(unique_id, mutation, resolved, **flags):
     row = {"UNIQUEID": unique_id, "GENE": "Rv0678", "MUTATION": mutation,
            "MINOR_MUTATION": resolved, "IS_MINOR": True, "IS_NULL": False,
            "IS_HET_CALL": False, "IS_NULL_CALL": False, "REAL_MAJOR": False,
-           "UNCERTAIN": True, "FRS": 0.4}
+           "UNCERTAIN": True, "FRS": 0.4, "CODES_PROTEIN": True,
+           cohort.GENE_CODES: True}
     row.update(flags)
     return row
 
@@ -236,6 +237,9 @@ def confounded_cohort(seed=7, carriers=40, shift=1.0,
     frame = pd.concat([reference, carrier], ignore_index=True)
     frame["resistant_BDQ"] = frame.lower_BDQ > -3.0
     frame["CLUSTER"] = frame.index.astype(str)
+    # group_masks reads this column as it reads MINOR_GROUP, so every frame
+    # passed to it carries one.
+    frame["MULTI_ALLELES"] = np.nan
     return frame
 
 
@@ -375,3 +379,167 @@ def test_each_estimate_draws_from_its_own_stream():
     assert alone.equals(again)
     assert not hetero.stream("adjusted BDQ").integers(0, 1 << 30, 3).tolist() == \
         hetero.stream("adjusted CFZ").integers(0, 1 << 30, 3).tolist()
+
+
+def multi_carrier(unique_id, forms, **flags):
+    """Rows putting several minor alleles at the subject gene in one sample."""
+    rows = []
+    for index, (token, resolved) in enumerate(forms):
+        row = minor_row(unique_id, token, resolved, **flags)
+        row["FRS"] = round(0.2 + 0.15 * index, 3)
+        row["GENE_POSITION"] = float(40 + 10 * index)
+        rows.append(row)
+    return rows
+
+
+def test_several_alleles_at_the_subject_gene_make_their_own_group(data_dir):
+    """eligible_samples admits exactly one minor allele, so a sample carrying
+    two falls to neither the carrier groups nor the reference group. It is still
+    a sample with nothing wild type about it."""
+    mutations = resolved_mutations(data_dir)
+    sample = "several.alleles"
+    doctored = pd.concat([mutations, pd.DataFrame(multi_carrier(
+        sample, [("141_minorindel", "141_ins_c"), ("C46Z", "C46G")]))],
+        ignore_index=True)
+
+    keep, _ = hetero.eligible_samples(doctored)
+    assert sample not in keep
+    several, _ = hetero.multi_allele_samples(doctored)
+    assert sample in several
+    assert not (keep & several)
+
+
+def test_anything_else_in_the_three_genes_excludes_a_multi_carrier(data_dir):
+    mutations = resolved_mutations(data_dir)
+    base = multi_carrier("spoiled",
+                         [("141_minorindel", "141_ins_c"), ("C46Z", "C46G")])
+    for label, extra in (
+            ("a major variant", {"UNIQUEID": "spoiled", "GENE": "pepQ",
+                                 "MUTATION": "P69L", "MINOR_MUTATION": None,
+                                 "IS_MINOR": False, "IS_NULL": False,
+                                 "IS_HET_CALL": False, "IS_NULL_CALL": False,
+                                 "REAL_MAJOR": True, "UNCERTAIN": False,
+                                 "FRS": 1.0}),
+            ("a null call", {"UNIQUEID": "spoiled", "GENE": "atpE",
+                             "MUTATION": "A9X", "MINOR_MUTATION": None,
+                             "IS_MINOR": False, "IS_NULL": True,
+                             "IS_HET_CALL": False, "IS_NULL_CALL": True,
+                             "REAL_MAJOR": False, "UNCERTAIN": True,
+                             "FRS": None}),
+            ("a minor allele elsewhere", {"UNIQUEID": "spoiled", "GENE": "pepQ",
+                                          "MUTATION": "V45Z",
+                                          "MINOR_MUTATION": "V45L",
+                                          "IS_MINOR": True, "IS_NULL": False,
+                                          "IS_HET_CALL": False,
+                                          "IS_NULL_CALL": False,
+                                          "REAL_MAJOR": False,
+                                          "UNCERTAIN": True, "FRS": 0.3})):
+        doctored = pd.concat(
+            [mutations, pd.DataFrame(base + [extra])], ignore_index=True)
+        several, _ = hetero.multi_allele_samples(doctored)
+        assert "spoiled" not in several, label
+
+    clean = pd.concat([mutations, pd.DataFrame(base)], ignore_index=True)
+    assert "spoiled" in hetero.multi_allele_samples(clean)[0]
+
+
+def test_the_profile_counts_alleles_positions_and_read_fractions(data_dir):
+    mutations = resolved_mutations(data_dir)
+    rows = multi_carrier("profiled", [("141_minorindel", "141_ins_c"),
+                                      ("C46Z", "C46G"),
+                                      ("T33Z", "T33P")])
+    doctored = pd.concat([mutations, pd.DataFrame(rows)], ignore_index=True)
+    several, _ = hetero.multi_allele_samples(doctored)
+    profile, unparsed = hetero.multi_allele_profile(doctored, several)
+    assert unparsed == 0
+    row = profile.loc["profiled"]
+    assert row.alleles == 3
+    assert row.positions == 3
+    assert row.read_fraction_sum == pytest.approx(0.2 + 0.35 + 0.5)
+    assert row.read_fraction_low == pytest.approx(0.2)
+    assert row.read_fraction_high == pytest.approx(0.5)
+    # 141_ins_c is a frameshift, C46G and T33P are substitutions
+    assert row.loss_of_function == 1
+
+
+def test_the_subsets_by_allele_count_partition_the_group():
+    frame = confounded_cohort()
+    frame.loc[frame.index[:30], "MULTI_ALLELES"] = 2.0
+    frame.loc[frame.index[30:44], "MULTI_ALLELES"] = 3.0
+    frame.loc[frame.index[44:50], "MULTI_ALLELES"] = 4.0
+    rows = pd.DataFrame(hetero.multi_allele_rows(frame, None, "BDQ"))
+    by = rows.set_index("subset")
+    assert by.loc["all", "isolates"] == 50
+    assert by.loc["two alleles", "isolates"] == 30
+    assert by.loc["three or more", "isolates"] == 20
+    assert (by.loc["two alleles", "isolates"]
+            + by.loc["three or more", "isolates"] == by.loc["all", "isolates"])
+    assert (by.loc["two alleles", "resistant"]
+            + by.loc["three or more", "resistant"] == by.loc["all", "resistant"])
+
+
+def test_the_multi_group_enters_the_joint_fit_as_its_own_column():
+    frame = confounded_cohort()
+    carriers = frame.index[frame.MINOR_GROUP.isna()][:40]
+    frame.loc[carriers, "MULTI_ALLELES"] = 2.0
+    frame.loc[carriers, "GROUP"] = "uncertain"
+    masks = hetero.group_masks(frame)
+    assert "minor, two or more alleles" in masks
+    assert int(masks["minor, two or more alleles"].sum()) == 40
+
+    rows = pd.DataFrame(hetero.adjusted_rows(
+        frame, "BDQ", hetero.stream("adjusted BDQ"), draws=20))
+    group = rows[rows.group.eq("minor, two or more alleles")]
+    assert len(group) == 2
+    assert set(group.estimate) == {"joint shift", "site-adjusted shift"}
+    assert group["isolates"].eq(40).all()
+
+
+def test_a_cohort_with_no_multi_carrier_is_not_an_error(data_dir):
+    """The fixture plants one minor allele per sample, so the group is empty
+    there. An empty selection has to return an empty profile rather than fail in
+    the parser, or the module cannot run on a collection that happens to hold
+    none."""
+    mutations = resolved_mutations(data_dir)
+    several, _ = hetero.multi_allele_samples(mutations)
+    assert several == set()
+    profile, unparsed = hetero.multi_allele_profile(mutations, several)
+    assert profile.empty
+    assert unparsed == 0
+    assert list(profile.columns) == ["alleles", "positions", "loss_of_function",
+                                     "read_fraction_sum", "read_fraction_low",
+                                     "read_fraction_high"]
+
+    frame, counts = hetero.prepare(mutations, cohort.build_status(
+        cohort.load_mutations()))
+    assert frame.MULTI_ALLELES.isna().all()
+    assert counts["several"] == 0
+    rows = pd.DataFrame(hetero.adjusted_rows(
+        frame, "BDQ", hetero.stream("adjusted BDQ"), draws=5))
+    group = rows[rows.group.eq("minor, two or more alleles")]
+    assert len(group) == 2
+    assert group["isolates"].eq(0).all()
+    assert group["withheld"].str.contains("below 12").all()
+
+
+def test_two_alleles_at_one_position_are_counted_as_one_position(data_dir):
+    """Across the 111 real rows no isolate carries two alleles at one position,
+    so the distinction has to be planted to be checked. It matters: two alleles
+    competing at one position are alternatives, where two at different positions
+    can sit in different sub-populations."""
+    mutations = resolved_mutations(data_dir)
+    rows = multi_carrier("one.position", [("C46Z", "C46G"), ("C46Z", "C46T")])
+    doctored = pd.concat([mutations, pd.DataFrame(rows)], ignore_index=True)
+    several, _ = hetero.multi_allele_samples(doctored)
+    profile, _ = hetero.multi_allele_profile(doctored, several)
+    row = profile.loc["one.position"]
+    assert row.alleles == 2
+    assert row.positions == 1
+
+    spread = multi_carrier("two.positions", [("C46Z", "C46G"), ("T33Z", "T33P")])
+    doctored = pd.concat([mutations, pd.DataFrame(spread)], ignore_index=True)
+    several, _ = hetero.multi_allele_samples(doctored)
+    profile, _ = hetero.multi_allele_profile(doctored, several)
+    row = profile.loc["two.positions"]
+    assert row.alleles == 2
+    assert row.positions == 2

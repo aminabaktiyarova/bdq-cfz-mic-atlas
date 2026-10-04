@@ -44,7 +44,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from garc import parse_frame  # noqa: E402
+from garc import GENE_CODES, gene_codes_protein, parse_frame  # noqa: E402
 
 DATA = Path("data/cryptic-v3.4.0")
 
@@ -83,19 +83,76 @@ def flatten(df):
     return df
 
 
+def ranked_counts(series, limit=None, dropna=True):
+    """Value counts ordered by frequency, ties ordered by value.
+
+    value_counts leaves the order of equally frequent values to the grouping,
+    and that order differs between pandas versions, so a listing cut to a fixed
+    length can take a different tied value on a different installation. Sorting
+    the index and then sorting by count with a stable sort fixes both the order
+    of the listing and which values fall inside the cut.
+    """
+    counts = series.value_counts(dropna=dropna)
+    counts = counts.sort_index().sort_values(ascending=False, kind="stable")
+    return counts if limit is None else counts.head(limit)
+
+
+def double_reported_deletion(df):
+    """Which rows report a deletion that another row already reports.
+
+    A large deletion is written twice in v3.4.0, once as del_<fraction> and once
+    as the sequence removed, so one event in one gene of one sample would count
+    as two variants. The row carrying the sequence is marked and the
+    del_<fraction> row kept, because that row carries the fraction and classifies
+    as a gene deletion. Where a sample and gene hold more than one deletion
+    beside a del_<fraction> row, the largest is the one written twice.
+    """
+    import numpy as np
+    import pandas as pd
+
+    keys = ["UNIQUEID", "GENE"]
+    columns = keys + ["KIND", "INDEL_TYPE", "INDEL_SIZE", "IS_MINOR"]
+    blank = pd.Series(np.zeros(len(df), dtype=bool), index=df.index)
+    if [column for column in columns if column not in df.columns]:
+        return blank
+    work = df.reset_index(drop=True)
+    whole = work.loc[work.KIND.eq("GENE_DELETION"), keys]
+    if whole.empty:
+        return blank
+    # Every mask below is combined into a new object rather than updated in
+    # place. pandas hands out read-only arrays from version 3, and an in-place
+    # update of one raises.
+    beside_one = pd.Series(
+        pd.MultiIndex.from_frame(work[keys]).isin(
+            set(map(tuple, whole.to_numpy()))),
+        index=work.index)
+    partner = (work.KIND.eq("INDEL") & work.INDEL_TYPE.eq("del")
+               & ~work.IS_MINOR.eq(True) & work.INDEL_SIZE.notna()
+               & beside_one)
+    if not partner.any():
+        return blank
+    largest = work[partner].groupby(keys, observed=True).INDEL_SIZE.idxmax()
+    marked = np.zeros(len(df), dtype=bool)
+    marked[largest.to_numpy(dtype=int)] = True
+    return pd.Series(marked, index=df.index)
+
+
 def classify(df):
     """Add CLASS, IS_LOF, REAL_MAJOR and UNCERTAIN to a parsed mutation frame."""
     import numpy as np
 
     df = df.copy()
-    df["REAL_MAJOR"] = df.IS_REAL_VARIANT & ~df.IS_MINOR
+    df["DOUBLE_REPORTED"] = double_reported_deletion(df)
+    df["REAL_MAJOR"] = df.IS_REAL_VARIANT & ~df.IS_MINOR & ~df.DOUBLE_REPORTED
     df["UNCERTAIN"] = df.IS_NULL_CALL | df.IS_HET_CALL | df.IS_MINOR
+    # A promoter has no reading frame, so an indel confined to one is a change
+    # to the promoter, and the promoter test comes before the indel test.
     df["CLASS"] = np.where(
         df.KIND.eq("GENE_DELETION"), "gene deletion",
         np.where(df.IS_FRAMESHIFT.eq(True), "frameshift",
         np.where(df.IS_STOP, "stop codon",
-        np.where(df.KIND.eq("INDEL"), "in-frame indel",
-        np.where(df.AFFECTS.eq("PROM"), "promoter", "substitution")))))
+        np.where(df.AFFECTS.eq("PROM"), "promoter",
+        np.where(df.KIND.eq("INDEL"), "in-frame indel", "substitution")))))
     df["IS_LOF"] = df.REAL_MAJOR & df.CLASS.isin(LOF_CLASSES)
     return df
 
@@ -110,6 +167,9 @@ def load_mutations(genes=None):
         raise FileNotFoundError(f"{path} not found")
     dataset = ds.dataset(path, format="parquet")
     df = flatten(dataset.to_table(filter=ds.field("GENE").isin(genes)).to_pandas())
+    # The grammar needs to know whether the gene codes protein, which the
+    # table's own CODES_PROTEIN column does not say.
+    df[GENE_CODES] = gene_codes_protein(df)
     df = parse_frame(df)
     if not df.PARSED.all():
         raise ValueError("some mutation strings did not parse; run code/check_parsing.py")

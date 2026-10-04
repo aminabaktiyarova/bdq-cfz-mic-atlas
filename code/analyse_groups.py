@@ -35,6 +35,11 @@ import cohort  # noqa: E402
 REPORT = Path("outputs/group_analysis_report.txt")
 MIN_STRATUM = 20  # a stratum smaller than this carries no usable information
 
+# The lineages carrying enough Rv0678 loss-of-function isolates for a stratum to
+# say anything. lineage1 carries two, which is why a homogeneity test over every
+# lineage answers a different question from one over these three.
+PRINCIPAL_LINEAGES = ("lineage2", "lineage3", "lineage4")
+
 _lines = []
 
 
@@ -56,19 +61,63 @@ def fisher(a, n1, b, n2):
     return odds, p
 
 
-def stratified(df, group_a, group_b, drug, by):
+def group_rows(df, drug):
+    """Every group except the reference group, against the reference group.
+
+    Each group in the cohort appears, including the ones that are not a single
+    variant class: a sample carrying several variants and a sample whose calls
+    are uncertain both have a resistance rate, and a table that leaves them out
+    cannot be read against the cohort.
+    """
+    reference = df[df.GROUP.eq("reference")]
+    b, n2 = int(reference[f"resistant_{drug}"].sum()), len(reference)
+    rows = []
+    for group in df.GROUP.dropna().unique():
+        if group == "reference":
+            continue
+        sub = df[df.GROUP.eq(group)]
+        a, n1 = int(sub[f"resistant_{drug}"].sum()), len(sub)
+        if not n1:
+            continue
+        odds, p = fisher(a, n1, b, n2)
+        rows.append({
+            "group": group, "n": n1, "resistant": a,
+            "% R": round(100 * a / n1, 1),
+            "odds ratio": round(odds, 1) if a else 0.0,
+            "p": f"{p:.2g}",
+        })
+    return sorted(rows, key=lambda row: -row["n"])
+
+
+def direct(df, group_a, group_b, drug):
+    """group_a against group_b, rather than each against the reference group."""
+    first, second = df[df.GROUP.eq(group_a)], df[df.GROUP.eq(group_b)]
+    a, n1 = int(first[f"resistant_{drug}"].sum()), len(first)
+    b, n2 = int(second[f"resistant_{drug}"].sum()), len(second)
+    odds, p = fisher(a, n1, b, n2)
+    return {"drug": drug, "group": group_a, "n": n1, "resistant": a,
+            "against": group_b, "against n": n2, "against resistant": b,
+            "odds ratio": round(odds, 2), "p": f"{p:.3g}"}
+
+
+def stratified(df, group_a, group_b, drug, by, only=None):
     """
     Mantel-Haenszel odds ratio for group_a against group_b, holding `by` constant.
 
     Strata contributing no information (too few samples, or no exposed samples)
     are dropped and reported, because including them adds noise without adding
-    evidence.
+    evidence. `only` restricts the estimate to the strata it names, which is a
+    different question from an estimate over every stratum and is reported as
+    such.
     """
     import numpy as np
     import pandas as pd
     from statsmodels.stats.contingency_tables import StratifiedTable
 
     subset = df[df.GROUP.isin([group_a, group_b])]
+    if only is not None:
+        subset = subset[subset[by].isin(only)]
+        say(f"  strata restricted to {', '.join(map(str, only))}")
     rows, tables, dropped = [], [], []
 
     for stratum, chunk in subset.groupby(by, observed=True):
@@ -144,29 +193,13 @@ def main():
             })
         say(pd.DataFrame(rows).to_string(index=False))
 
-    # ---------------------------------------------- 2. class against reference
-    say("\n2. Each Rv0678 class against the reference group, unadjusted")
+    # ---------------------------------------------- 2. group against reference
+    say("\n2. Each group against the reference group, unadjusted")
     reference = df[df.GROUP == "reference"]
     for drug in cohort.DRUGS:
         say(f"\n{drug}:  reference is {int(reference[f'resistant_{drug}'].sum())}"
             f" of {len(reference):,} resistant")
-        rows = []
-        for group in cohort.GROUP_ORDER:
-            if not group.startswith("Rv0678") and group not in ("pepQ solo", "atpE solo"):
-                continue
-            sub = df[df.GROUP == group]
-            if len(sub) < 5:
-                continue
-            a, n1 = int(sub[f"resistant_{drug}"].sum()), len(sub)
-            b, n2 = int(reference[f"resistant_{drug}"].sum()), len(reference)
-            odds, p = fisher(a, n1, b, n2)
-            rows.append({
-                "group": group, "n": n1, "resistant": a,
-                "% R": round(100 * a / n1, 1),
-                "odds ratio": round(odds, 1) if a else 0.0,
-                "p": f"{p:.2g}",
-            })
-        say(pd.DataFrame(rows).to_string(index=False))
+        say(pd.DataFrame(group_rows(df, drug)).to_string(index=False))
 
     # ------------------------------------------------- 3. mmpL5 within classes
     say("\n3. The mmpL5 covariate, within each Rv0678 class")
@@ -284,6 +317,17 @@ def main():
     for drug in cohort.DRUGS:
         say(f"\n{drug}: Rv0678 loss of function against reference, mmpL5 intact, by lineage")
         stratified(intact, "Rv0678 loss of function", "reference", drug, "LINEAGE")
+
+    say("\n8. The lineage homogeneity test over the principal lineages")
+    for drug in cohort.DRUGS:
+        say(f"\n{drug}: Rv0678 loss of function against reference, mmpL5 intact, by lineage")
+        stratified(intact, "Rv0678 loss of function", "reference", drug, "LINEAGE",
+                   only=PRINCIPAL_LINEAGES)
+
+    say("\n9. Loss of function against substitution, mmpL5 intact")
+    say("")
+    say(pd.DataFrame([direct(intact, "Rv0678 loss of function", "Rv0678 substitution",
+                             drug) for drug in cohort.DRUGS]).to_string(index=False))
 
     write_report()
     say(f"\nWritten to {REPORT}")

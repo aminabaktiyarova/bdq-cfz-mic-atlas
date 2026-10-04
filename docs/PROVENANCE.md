@@ -279,6 +279,65 @@ and left-censored rows it is log2 of the stated concentration, within the 0.002 
 CRyPTIC's rounded concentration labels introduce. Every censoring decision in this project
 therefore parses the MIC string and no step reads LOG2MIC as a measurement.
 
+## Schema question 9: the mutation table's own conventions
+
+Four conventions decide how a row of MUTATIONS.parquet or PLATE_LAYOUT.parquet is read, and
+none is stated in the schema document. Each was checked against the 108,773 rows the four
+target genes carry.
+
+CODES_PROTEIN describes the mutation rather than the gene. It is True on exactly the rows
+whose position is positive: 106,549 SNPs and 1,456 indels inside a coding sequence, against
+731 SNPs, 22 indels and 15 gene deletions whose position is negative or absent. For a
+protein-coding gene such as Rv0678 the flag is therefore False on every promoter row, so a
+parser that reads it as the gene's nature treats those rows as though the gene were rRNA.
+This project derives a gene-level flag, GENE_CODES_PROTEIN, true where any mutation in the
+gene is placed in its coding sequence, and the grammar parser reads that instead.
+
+An indel's position is the first base it affects, so one written from the promoter can reach
+the gene. Twenty-two indel rows across the four genes start at a negative position. Fourteen
+stay inside the promoter. Eight reach the coding sequence, all in Rv0678, removing 438 or 483
+bases from position -3 or -43. A resolved minor allele can do the same: one sample carries
+-3_del_cttgtgag, eight bases from -3, five of them coding. What decides whether such a
+deletion shifts the reading frame is the number of bases it takes from the gene, not the sign
+of its position.
+
+A large deletion is written twice. Fifteen rows across the four genes carry one deletion as
+both del_<fraction> and the explicit sequence removed, thirteen in Rv0678 and two in mmpL5,
+with explicit sizes from 282 to 2,829 bases. Every carrier holds exactly one row of each
+kind, so counting rows without collapsing them counts one event as two variants, which moves
+a sample whose only finding is a gene deletion into a multiple-variant group. This project
+marks the explicit row DOUBLE_REPORTED and keeps the fraction row, which carries the deleted
+fraction.
+
+PLATE_LAYOUT writes two of its rows per drug and design with operators. The lowest well
+reads <=x, and a further row reads >x for the bin above the highest well, repeating that
+well's concentration with its own S or R label. Both numbers are tested concentrations, so
+the ladder is recovered by stripping the operators and deduplicating, while the R on the bin
+row belongs to the bin rather than to the well it repeats.
+
+## Where each published figure is computed
+
+Every figure in docs/RESULTS.md is written by one of these modules into the report named
+beside it. The reports are regenerated from the source tables and are not committed, because
+outputs/ is ignored.
+
+| Module | Report | What it carries |
+| --- | --- | --- |
+| code/inspect_mutations.py | mutations_inspection.txt | the mutation table's shape and memory |
+| code/check_parsing.py | parsing_check.txt | grammar coverage over six genes |
+| code/build_sample_status.py | sample_status_report.txt | per-genome genotype status |
+| code/audit_cohort.py | audit_report.txt | join integrity, patient replication, phenotype quality, the discovery and validation halves, rows carrying no MIC, and what the plates can measure |
+| code/analyse_groups.py | group_analysis_report.txt | every group against the reference group, the mmpL5 covariate, the gene deletions, stratified estimates, the homogeneity test over the principal lineages, and loss of function against substitution |
+| code/model_effects.py | model_report.txt | the lineage effect with site held constant |
+| code/cluster_adjust.py | cluster_report.txt | cluster structure, the three treatments of clonality, and the collapsed estimate under several seeds |
+| code/mic_model.py | mic_model_report.txt, mic_estimates.csv | the tested ladders, validation against planted parameters, what the excluded rows could do, and the fitted distributions |
+| code/heteroresistance.py | heteroresistance_report.txt, heteroresistance_estimates.csv, multi_allele_counts.csv | the uncertain group, resolved minor alleles, and the shifts with site held constant |
+| code/build_atlas.py | atlas_report.txt, atlas_evidence.csv | the per-variant layer |
+| code/unexplained.py | unexplained_report.txt, unexplained_counts.csv, unexplained_gene_sets.csv | resistance the genotype does not explain |
+| code/prediction_metrics.py | prediction_metrics.txt, prediction_metrics.csv, prediction_thresholds.csv | genotype rules as tests, and the threshold sweep |
+| code/discovery.py | discovery_report.txt, docs/PRE_REGISTRATION.md | the discovery half and the registered predictions |
+| code/validate.py | validation_report.txt | the held-out test |
+
 ## Open items raised by the schema and release notes
 
 1. The schema lists AMYGDA_DILUTION in UKMYC_PHENOTYPES and shows no TMAS column, although

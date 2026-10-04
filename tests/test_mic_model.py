@@ -8,11 +8,15 @@ estimator recovers parameters a median cannot.
 """
 
 import numpy as np
+import pandas as pd
 import pytest
 
-from mic_model import (concentration_series, fit_censored_linear,
+from mic_model import (PLANTED, bootstrap_mu, concentration_series,
+                       excluded_sensitivity, fit_censored_linear,
                        fit_censored_normal, log_interval_mass, mic_bounds,
-                       mic_recorded, parse_concentration, place_mics)
+                       mic_recorded, parse_concentration, place_mics,
+                       simulate_reports, stream, tiny_intervals,
+                       validate_estimator)
 
 LADDER = [0.008, 0.015, 0.03, 0.06, 0.12, 0.25, 0.5, 1.0]
 
@@ -368,3 +372,178 @@ def test_the_density_ratio_holds_where_the_mass_underflows():
         slope = gradient(np.array([0.0, 0.0]))[0]
         assert np.isfinite(slope)
         assert slope == pytest.approx(distance, rel=0.02)
+
+
+def placed_cohort(seed, samples=300, clone=0, clone_shift=2.0, grouped=True):
+    """A cohort on the ladder. The first clone samples sit clone_shift doublings
+    above the rest, and share one cluster when grouped and sit in clusters of
+    their own when not, so two frames from one seed hold the same MICs and
+    differ in nothing but how many independent units the resampling has."""
+    rng = np.random.default_rng(seed)
+    ladder = np.log2(np.array(LADDER))
+    centre = np.where(np.arange(samples) < clone, -5.3 + clone_shift, -5.3)
+    lower, upper = [], []
+    for value in rng.normal(centre, 1.1):
+        if value <= ladder[0]:
+            lower.append(-np.inf)
+            upper.append(ladder[0])
+        elif value > ladder[-1]:
+            lower.append(ladder[-1])
+            upper.append(np.inf)
+        else:
+            index = int(np.searchsorted(ladder, value))
+            lower.append(ladder[index - 1])
+            upper.append(ladder[index])
+    names = [f"c{index}" for index in range(samples)]
+    if grouped:
+        names[:clone] = ["outbreak"] * clone
+    return pd.DataFrame({"CLUSTER": names, "lower_BDQ": lower, "upper_BDQ": upper})
+
+
+def test_each_interval_draws_from_its_own_stream():
+    """An interval computed after another estimate must match the same interval
+    computed on its own, or a figure cannot be reproduced without rerunning
+    everything that preceded it."""
+    frame = placed_cohort(5)
+    alone = bootstrap_mu(frame, "BDQ", stream("BDQ Rv0678 promoter"), draws=20)
+
+    spent = stream("BDQ Rv0678 promoter")
+    spent.integers(0, 100, 5000)
+    assert bootstrap_mu(frame, "BDQ", spent, draws=20) != alone
+
+    other = stream("BDQ pepQ solo")
+    other.integers(0, 100, 5000)
+    again = bootstrap_mu(frame, "BDQ", stream("BDQ Rv0678 promoter"), draws=20)
+    assert again == alone
+    assert stream("BDQ Rv0678 promoter").integers(0, 1 << 30, 3).tolist() != \
+        stream("CFZ Rv0678 promoter").integers(0, 1 << 30, 3).tolist()
+
+
+def test_the_interval_resamples_clusters_rather_than_isolates():
+    """A group whose isolates come from one outbreak carries less information
+    than the same count of unrelated isolates, which the interval has to show."""
+    spread = {}
+    for grouped in (False, True):
+        interval = bootstrap_mu(placed_cohort(9, clone=100, grouped=grouped),
+                                "BDQ", stream("outbreak"), draws=150)
+        spread[grouped] = interval["high"] - interval["low"]
+    assert spread[True] > 2 * spread[False]
+
+
+def test_every_interval_in_the_report_is_seeded_by_its_own_name(data_dir, tmp_path,
+                                                                monkeypatch):
+    """Each interval has to be handed the stream named for the quantity it
+    belongs to. With one generator threaded through the run, an interval depends
+    on the estimates computed before it."""
+    import cohort
+    import mic_model
+
+    drawn = []
+
+    def record(frame, drug, rng, draws=None):
+        drawn.append(int(rng.integers(0, 1 << 30)))
+        return {"low": -5.0, "high": -4.0, "draws": 1}
+
+    monkeypatch.setattr(mic_model, "REPORT", tmp_path / "report.txt")
+    monkeypatch.setattr(mic_model, "ESTIMATES", tmp_path / "estimates.csv")
+    monkeypatch.setattr(mic_model, "bootstrap_mu", record)
+    mic_model.main()
+
+    names = [f"{drug} {group}" for drug in cohort.DRUGS
+             for group in cohort.GROUP_ORDER]
+    names += [f"{drug} {lineage} {label}" for drug in cohort.DRUGS
+              for lineage in ["lineage1", "lineage2", "lineage3", "lineage4"]
+              for label in ["loss of function", "substitution"]]
+    named = {int(mic_model.stream(name).integers(0, 1 << 30)) for name in names}
+
+    assert drawn, "the run computed no interval"
+    assert set(drawn) <= named, "an interval was handed a stream of no quantity"
+    assert len(set(drawn)) == len(drawn), "two intervals drew from one stream"
+
+
+def test_the_planted_validation_recovers_every_planted_distribution():
+    """The table in the results document is this function's output, so what it
+    claims has to hold for every row of it."""
+    rows = validate_estimator(LADDER, stream("planted parameters"))
+    assert len(rows) == len(PLANTED)
+    for row in rows:
+        assert row["fitted mean"] == pytest.approx(row["true mean"], abs=0.15)
+        assert row["fitted sd"] == pytest.approx(row["true sd"], abs=0.15)
+        assert row["naive median"] > row["fitted mean"], \
+            "the median of reported values is biased toward the plate floor"
+    heaviest = max(rows, key=lambda row: row["left-censored %"])
+    assert heaviest["left-censored %"] > 50
+    assert heaviest["naive median"] - heaviest["fitted mean"] > 0.4
+
+
+def test_a_draw_below_the_plate_is_reported_as_censored():
+    """A plate cannot report a value it never tested, so a draw under the first
+    well comes back censored at that well and one over the last above it."""
+    rng = np.random.default_rng(3)
+    low = simulate_reports(-20.0, 0.01, LADDER, rng, draws=20)
+    high = simulate_reports(20.0, 0.01, LADDER, rng, draws=20)
+    assert set(low) == {f"<={LADDER[0]}"}
+    assert set(high) == {f">{LADDER[-1]}"}
+
+    middle = simulate_reports(np.log2(LADDER[3]) - 0.5, 0.01, LADDER, rng, draws=20)
+    assert set(middle) == {f"{LADDER[3]}"}, \
+        "a draw between two wells is reported at the one that inhibited growth"
+
+
+def _reference_frame(plan, excluded=0, seed=4, sd=0.5):
+    """A reference group of (site, isolates, mean) rows placed on the ladder,
+    plus `excluded` rows carrying no MIC at all."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for site, isolates, mu in plan:
+        for value in simulate_reports(mu, sd, LADDER, rng, draws=isolates):
+            lower, upper = mic_bounds(value, LADDER)
+            rows.append({"GROUP": "reference", "SITEID": site,
+                         "lower_BDQ": lower, "upper_BDQ": upper})
+    for index in range(excluded):
+        rows.append({"GROUP": "reference", "SITEID": "99",
+                     "lower_BDQ": np.nan, "upper_BDQ": np.nan})
+    return pd.DataFrame(rows)
+
+
+def test_the_excluded_rows_move_a_mean_by_their_share_of_it():
+    """An excluded row acts only through the value it would have had, so the
+    movement is its share of the group times the gap."""
+    frame = _reference_frame([("A", 400, -5.0), ("B", 400, -5.0), ("C", 400, -4.0),
+                              ("D", 400, -7.5)], excluded=100)
+    result = excluded_sensitivity(frame, "BDQ", minimum=100)
+
+    assert (result["reference"], result["fitted"], result["excluded"]) == (1700, 1600, 100)
+    assert result["at site"] == "D", \
+        "the widest gap is the one furthest from the group mean in either direction"
+    assert result["widest site gap"] > 0
+    share = 100 / 1700
+    assert result["movement at that gap"] == pytest.approx(
+        round(share * result["widest site gap"], 3), abs=0.001)
+    assert result["movement at 3 doublings"] == pytest.approx(round(share * 3, 3),
+                                                              abs=0.001)
+
+
+def test_a_site_too_small_to_fit_is_left_out_of_the_widest_gap():
+    """A fit on a handful of intervals is not a site effect, however far it lands
+    from the group."""
+    frame = _reference_frame([("A", 400, -5.0), ("B", 400, -5.0), ("C", 400, -4.0),
+                              ("tiny", 20, 0.0)])
+    result = excluded_sensitivity(frame, "BDQ", minimum=100)
+    assert result["at site"] == "C"
+
+
+def test_an_interval_in_the_far_tail_is_where_the_mass_underflows():
+    """The mass of an interval far from the fitted mean cannot be formed as a
+    difference of two cumulative functions, which is what the log-space
+    evaluation exists for."""
+    central = _reference_frame([("A", 600, -5.0)], sd=0.3)
+    assert tiny_intervals(central, "BDQ", floor=1e-08)["below the floor"] == 0
+
+    doctored = pd.concat([central, _reference_frame([("A", 3, 3.0)], sd=0.3)],
+                         ignore_index=True)
+    result = tiny_intervals(doctored, "BDQ", floor=1e-08)
+    assert result["below the floor"] >= 3
+    assert 0 < result["smallest"] < 1e-08, \
+        "a mass this small is a number, and a difference of two cumulative "\
+        "functions would return zero for it"

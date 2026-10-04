@@ -82,7 +82,10 @@ figures. It fails loudly if the local data is a different release.
 Each module reads the CRyPTIC tables directly and writes to `outputs/`. None
 reads another module's output, so they can be run in any order, with one
 exception: `discovery.py` writes `docs/PRE_REGISTRATION.md`, and `validate.py`
-refuses to run until that file is committed and unmodified.
+refuses to run until that file is committed and unmodified. Once it is in git,
+`discovery.py` leaves it alone and reports its fresh estimates in its own report,
+because rewriting it would put predictions made after the result was known where
+predictions made before it used to be.
 
 ```
 python code/inspect_mutations.py    # structure of the MUTATIONS table
@@ -111,8 +114,8 @@ table is defined in `docs/DATA_DICTIONARY.md`.
 | `atlas_evidence.csv` | `code/build_atlas.py` |
 | `mic_estimates.csv` | `code/mic_model.py` |
 | `unexplained_counts.csv`, `unexplained_gene_sets.csv` | `code/unexplained.py` |
-| `heteroresistance_estimates.csv` | `code/heteroresistance.py` |
-| `prediction_metrics.csv` | `code/prediction_metrics.py` |
+| `heteroresistance_estimates.csv`, `multi_allele_counts.csv` | `code/heteroresistance.py` |
+| `prediction_metrics.csv`, `prediction_thresholds.csv` | `code/prediction_metrics.py` |
 | `gene_vocabulary.csv` | `code/inspect_mutations.py` |
 
 Outputs are regenerated from the CRyPTIC release and are not tracked.
@@ -123,9 +126,9 @@ Outputs are regenerated from the CRyPTIC release and are not tracked.
 pytest
 ```
 
-The suite runs against a synthetic dataset built to the CRyPTIC schema with
-known ground truth planted in it, so it needs no downloaded data and finishes in
-about half a minute.
+The suite is 214 tests against a synthetic dataset built to the CRyPTIC schema
+with known ground truth planted in it, so it needs no downloaded data and
+finishes in under a minute.
 
 It checks the things the results depend on rather than the things that are easy
 to check. That a null call and a het call are not variants and not wild type.
@@ -138,7 +141,12 @@ effect differs between them. That collapsing clonal clusters removes an effect
 planted so as to be driven entirely by one outbreak. That the prediction
 interval is never narrower than the discovery and held-out errors combined. That
 a resistant isolate whose genes could not be called is counted neither as
-carrying a variant nor as lacking one.
+carrying a variant nor as lacking one. That a deletion the source table writes
+twice counts as one variant, and that the larger of two deletions in one gene is
+the one taken as the second report. That the coding flag is read over the gene
+rather than off the row, since the column is false on every promoter mutation.
+That each interval and each resampled estimate is seeded by the quantity it
+belongs to, so a figure can be reproduced without rerunning what preceded it.
 
 Each test was verified by breaking the code it covers and confirming the test
 fails.

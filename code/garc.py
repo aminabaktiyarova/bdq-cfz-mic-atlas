@@ -19,8 +19,12 @@ the authoritative definition:
   nucleotide number. A negative position is within the promoter.
 
   Insertions and deletions take the form position_ins_bases or position_del_n.
-  A frameshift is an insertion or deletion whose length is not divisible by
-  three.
+  A frameshift is a change to a coding sequence whose length is not divisible by
+  three. The position is the first base affected, so a deletion written from a
+  negative position runs forward out of the promoter and into the gene, and only
+  the bases it takes from the gene count towards the frame. An insertion at a
+  negative position adds bases upstream of the start codon and leaves the gene's
+  own sequence, and so its frame, as it was.
 
   A whole-gene deletion is written del_1.0, and a partial one del_0.<number>,
   where the number is the fraction of the gene deleted. So del_0.81 means 81
@@ -105,9 +109,12 @@ def parse_mutation(mutation, codes_protein):
     """
     Parse one GARC mutation string.
 
-    codes_protein is the CODES_PROTEIN flag from the same row, used to tell a
-    coding sequence from ribosomal RNA. A negative position always means the
-    promoter regardless of that flag.
+    codes_protein says whether the gene codes protein, which tells a coding
+    sequence from ribosomal RNA. It is a property of the gene rather than of the
+    row: the CODES_PROTEIN column of the mutation tables is True only where the
+    mutation itself falls in the coding sequence, so parse_frame takes it over
+    the gene before parsing. A negative position means the promoter whatever the
+    flag says, except for a deletion long enough to reach the gene.
 
     Returns a dict with the keys in FIELDS. PARSED is False if the string did
     not match the grammar, which callers must treat as an error rather than
@@ -164,7 +171,17 @@ def parse_mutation(mutation, codes_protein):
     if match:
         position, indel_type, payload = int(match.group(1)), match.group(2), match.group(3)
         size = int(payload) if payload.isdigit() else len(payload)
-        affects = "PROM" if position < 0 else ("CDS" if codes_protein else "RNA")
+        body = "CDS" if codes_protein else "RNA"
+        if position > 0:
+            affects, taken = body, size
+        elif indel_type == "ins":
+            affects, taken = "PROM", 0
+        else:
+            # A deletion runs forward from its position. GARC numbers the
+            # promoter -1, -2, ... and has no zero, so a deletion starting at
+            # -n takes n bases from the promoter before it reaches the gene.
+            taken = max(0, size - abs(position))
+            affects = body if taken else "PROM"
         result = _blank(True)
         result.update(
             KIND="INDEL",
@@ -172,9 +189,10 @@ def parse_mutation(mutation, codes_protein):
             POSITION=position,
             INDEL_TYPE=indel_type,
             INDEL_SIZE=size,
-            # Only a coding sequence has a reading frame to shift. An indel in a
-            # promoter or in rRNA changes length without shifting any frame.
-            IS_FRAMESHIFT=(affects == "CDS") and (size % 3) != 0,
+            # Only a coding sequence has a reading frame to shift, and only the
+            # bases taken from it shift the frame. A change confined to a
+            # promoter, or to rRNA, alters length without shifting any frame.
+            IS_FRAMESHIFT=(affects == "CDS") and (taken % 3) != 0,
             IS_REAL_VARIANT=True,
         )
         return result
@@ -209,15 +227,39 @@ def parse_mutation(mutation, codes_protein):
     return _blank(False)
 
 
-def parse_frame(df, mutation_column="MUTATION", codes_column="CODES_PROTEIN"):
+GENE_CODES = "GENE_CODES_PROTEIN"
+
+
+def gene_codes_protein(df, codes_column="CODES_PROTEIN", gene_column="GENE"):
+    """
+    Whether the gene each row belongs to codes protein.
+
+    In v3.4.0 CODES_PROTEIN is True only on a row whose mutation falls inside
+    the coding sequence, so it is False on every promoter mutation and on every
+    gene deletion, and on its own it says nothing about the gene. A gene codes
+    protein if any mutation in it is placed in its coding sequence. A row whose
+    flag is missing counts as no evidence either way.
+    """
+    flags = df[codes_column].eq(True)
+    return flags.groupby(df[gene_column], observed=True).transform("any")
+
+
+def parse_frame(df, mutation_column="MUTATION", codes_column=GENE_CODES):
     """
     Parse a whole DataFrame of mutations and return it with the parsed fields
     added as columns. Distinct mutation strings are parsed once and reused,
     which matters because the same variant recurs across thousands of samples.
+
+    The column named by codes_column must hold whether the row's gene codes
+    protein, which is what the grammar needs and is not what the CODES_PROTEIN
+    column of the mutation tables holds. gene_codes_protein derives it over a
+    whole table and a caller adds it as GENE_CODES before parsing, so that
+    parsing a slice of a table gives the same answer as parsing all of it.
     """
     import pandas as pd
 
     keys = df[[mutation_column, codes_column]].drop_duplicates()
     parsed = [parse_mutation(m, c) for m, c in zip(keys[mutation_column], keys[codes_column])]
     lookup = pd.concat([keys.reset_index(drop=True), pd.DataFrame(parsed)], axis=1)
-    return df.merge(lookup, on=[mutation_column, codes_column], how="left", validate="many_to_one")
+    return df.merge(lookup, on=[mutation_column, codes_column], how="left",
+                    validate="many_to_one")

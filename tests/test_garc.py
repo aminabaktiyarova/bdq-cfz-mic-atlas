@@ -8,9 +8,10 @@ rather than residues, and that neither is evidence a variant is present or
 absent.
 """
 
+import pandas as pd
 import pytest
 
-from garc import parse_mutation
+from garc import GENE_CODES, gene_codes_protein, parse_frame, parse_mutation
 
 
 @pytest.mark.parametrize("mutation, codes_protein, kind, affects", [
@@ -83,6 +84,73 @@ def test_frameshift_only_applies_where_there_is_a_reading_frame():
         "a promoter has no reading frame to shift"
     assert parse_mutation("2814_ins_g", False)["IS_FRAMESHIFT"] is False, \
         "rRNA has no reading frame to shift"
+
+
+@pytest.mark.parametrize("mutation, affects, frameshift", [
+    ("-8_del_at", "PROM", False),           # two bases, both upstream
+    ("-3_del_cttgtgagc", "CDS", False),     # nine bases, six of them coding
+    ("-3_del_cttgtgag", "CDS", True),       # eight bases, five of them coding
+    ("-1_del_at", "CDS", True),             # one base upstream, one coding
+    ("-1_del_atg", "CDS", True),            # three bases, two of them coding
+    ("-3_ins_cttgtgag", "PROM", False),     # inserted upstream of the gene
+])
+def test_a_deletion_from_the_promoter_can_reach_the_gene(mutation, affects, frameshift):
+    result = parse_mutation(mutation, True)
+    assert result["AFFECTS"] == affects
+    assert result["IS_FRAMESHIFT"] is frameshift
+
+
+def test_a_deletion_reaching_rrna_shifts_no_frame():
+    result = parse_mutation("-3_del_cttgtgag", False)
+    assert result["AFFECTS"] == "RNA"
+    assert result["IS_FRAMESHIFT"] is False, "rRNA has no reading frame to shift"
+
+
+def test_the_position_of_an_upstream_deletion_is_still_its_first_base():
+    result = parse_mutation("-3_del_cttgtgag", True)
+    assert result["POSITION"] == -3
+    assert result["INDEL_SIZE"] == 8
+
+
+def _rows(pairs):
+    """A mutation frame of (gene, mutation, CODES_PROTEIN) rows."""
+    return pd.DataFrame([{"GENE": gene, "MUTATION": mutation,
+                          "CODES_PROTEIN": codes_protein}
+                         for gene, mutation, codes_protein in pairs])
+
+
+def test_the_coding_flag_is_read_over_the_gene_not_the_row():
+    frame = _rows([("Rv0678", "N4T", True),
+                   ("Rv0678", "c-11a", False),
+                   ("rrl", "g2814c", False)])
+    coding = gene_codes_protein(frame)
+    assert list(coding) == [True, True, False], \
+        "CODES_PROTEIN is False on every promoter row, so the gene is only "\
+        "coding if some mutation in it is placed in the coding sequence"
+
+
+def test_a_missing_coding_flag_is_not_evidence_of_coding():
+    frame = _rows([("Rv0678", "N4T", None)])
+    assert list(gene_codes_protein(frame)) == [False]
+
+
+def test_a_deletion_reaching_the_gene_is_parsed_against_the_gene():
+    frame = _rows([("Rv0678", "N4T", True), ("Rv0678", "-3_del_cttgtgag", False)])
+    frame[GENE_CODES] = gene_codes_protein(frame)
+    parsed = parse_frame(frame)
+    deletion = parsed[parsed.MUTATION.eq("-3_del_cttgtgag")].iloc[0]
+    assert deletion.AFFECTS == "CDS"
+    assert deletion.IS_FRAMESHIFT
+
+
+def test_a_deletion_reaching_rrna_is_parsed_against_that_gene():
+    frame = _rows([("rrl", "g2814c", False), ("rrl", "-3_del_cttgtgag", False)])
+    frame[GENE_CODES] = gene_codes_protein(frame)
+    parsed = parse_frame(frame)
+    deletion = parsed[parsed.MUTATION.eq("-3_del_cttgtgag")].iloc[0]
+    assert deletion.AFFECTS == "RNA"
+    assert deletion.IS_FRAMESHIFT is not None, "an unknown length is not a known one"
+    assert not deletion.IS_FRAMESHIFT
 
 
 def test_rrna_change_is_never_synonymous():

@@ -51,6 +51,10 @@ import cohort  # noqa: E402
 REPORT = Path("outputs/cluster_report.txt")
 DRAWS = 200
 SEED = 20260101
+# At DRAWS draws the median of the collapsed estimates carries Monte Carlo noise
+# of its own. The sweep recomputes it under this many seeds so a reader can see
+# how far it moves, and that the fraction of draws above 1 does not.
+SWEEP_SEEDS = 5
 MIN_STRATUM = 20
 MAIN_LINEAGES = ["lineage1", "lineage2", "lineage3", "lineage4"]
 
@@ -188,6 +192,35 @@ def collapsed_draws(frame, drug, rng):
     }
 
 
+def exposed_frame(df, groups, lineage=None):
+    """The comparison frame: these groups against the reference group, with
+    EXPOSED marking the carriers."""
+    frame = df[df.GROUP.isin(list(groups) + ["reference"])]
+    if lineage is not None:
+        frame = frame[frame.LINEAGE.eq(lineage)]
+    frame = frame.copy()
+    frame["EXPOSED"] = frame.GROUP.isin(groups)
+    return frame
+
+
+def seed_sweep(frame, drug, label, seeds=SWEEP_SEEDS):
+    """The collapsed estimate recomputed under several seeds.
+
+    Returns how far the median and the fraction above 1 move across them, which
+    is what says which of the two can be quoted.
+    """
+    results = [collapsed_draws(frame, drug, stream(f"{label} {drug} sweep {index}"))
+               for index in range(seeds)]
+    results = [result for result in results if result]
+    if not results:
+        return None
+    medians = [result["median"] for result in results]
+    above = [result["above_one"] for result in results]
+    return {"label": label, "drug": drug, "seeds": len(results),
+            "median low": round(min(medians), 2), "median high": round(max(medians), 2),
+            "above 1 low": round(100 * min(above)), "above 1 high": round(100 * max(above))}
+
+
 def compare(frame, drug, label):
     import pandas as pd
 
@@ -255,7 +288,7 @@ def main():
 
     say("\n  Largest clusters carrying an Rv0678 variant:")
     carriers = df[df.GROUP.str.startswith("Rv0678")]
-    top = carriers.CLUSTER.value_counts().head(10)
+    top = cohort.ranked_counts(carriers.CLUSTER, 10)
     detail = pd.DataFrame({"isolates": top})
     detail["BDQ resistant"] = [int(carriers[carriers.CLUSTER == c].resistant_BDQ.sum()) for c in top.index]
     detail["CFZ resistant"] = [int(carriers[carriers.CLUSTER == c].resistant_CFZ.sum()) for c in top.index]
@@ -271,10 +304,7 @@ def main():
     for drug in cohort.DRUGS:
         say(f"\n{drug}: Rv0678 loss of function against reference")
         for lineage in MAIN_LINEAGES:
-            frame = intact[
-                intact.LINEAGE.eq(lineage) & intact.GROUP.isin(lof_groups + ["reference"])
-            ].copy()
-            frame["EXPOSED"] = frame.GROUP.isin(lof_groups)
+            frame = exposed_frame(intact, lof_groups, lineage)
             if int(frame.EXPOSED.sum()) < 5:
                 continue
             compare(frame, drug, lineage)
@@ -284,10 +314,7 @@ def main():
     for drug in cohort.DRUGS:
         say(f"\n{drug}: Rv0678 substitution against reference")
         for lineage in MAIN_LINEAGES:
-            frame = intact[
-                intact.LINEAGE.eq(lineage) & intact.GROUP.isin(["Rv0678 substitution", "reference"])
-            ].copy()
-            frame["EXPOSED"] = frame.GROUP.eq("Rv0678 substitution")
+            frame = exposed_frame(intact, ["Rv0678 substitution"], lineage)
             if int(frame.EXPOSED.sum()) < 5:
                 continue
             compare(frame, drug, lineage)
@@ -300,9 +327,21 @@ def main():
             ("Rv0678 loss of function", lof_groups),
             ("Rv0678 substitution", ["Rv0678 substitution"]),
         ]:
-            frame = intact[intact.GROUP.isin(groups + ["reference"])].copy()
-            frame["EXPOSED"] = frame.GROUP.isin(groups)
-            compare(frame, drug, label)
+            compare(exposed_frame(intact, groups), drug, label)
+
+    # --------------------------------------------- 5. how far the median moves
+    say("\n5. The collapsed estimate under several seeds")
+    say("")
+    rows = []
+    for drug in cohort.DRUGS:
+        rows.append(seed_sweep(exposed_frame(intact, lof_groups), drug,
+                               "Rv0678 loss of function"))
+    rows.append(seed_sweep(exposed_frame(intact, lof_groups, "lineage4"), "CFZ",
+                           "lineage4 loss of function"))
+    say(pd.DataFrame([row for row in rows if row]).to_string(index=False))
+    say("")
+    say("The median moves with the seed and the fraction above 1 does not, which is")
+    say("why the tables above quote the fraction.")
 
     say("\n\nHow to read these three numbers together.")
     say("")

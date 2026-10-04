@@ -73,8 +73,8 @@ Across all 54,057 genomes:
 | Category | Genomes |
 | --- | --- |
 | Reference | 49,971 |
-| Solo, exactly one variant | 2,575 |
-| Two or more variants | 88 |
+| Solo, exactly one variant | 2,588 |
+| Two or more variants | 75 |
 | Excluded as uncertain | 1,423 |
 
 51,305 genomes carry no real major-allele variant in the three genes. 1,334 of
@@ -92,24 +92,31 @@ the analysis cohort:
 | pepQ solo | 217 |
 | Rv0678 substitution | 195 |
 | Rv0678 frameshift | 148 |
-| Rv0678 promoter | 82 |
-| multiple variants | 20 |
+| Rv0678 promoter | 83 |
+| multiple variants | 14 |
 | atpE solo | 10 |
+| Rv0678 gene deletion | 6 |
 | Rv0678 stop codon | 5 |
-| Rv0678 in-frame indel | 5 |
+| Rv0678 in-frame indel | 4 |
 
 Real major-allele variants across the full 54,057, by gene and class:
 
 | Gene | Frameshift | Gene deletion | In-frame indel | Promoter | Stop codon | Substitution |
 | --- | --- | --- | --- | --- | --- | --- |
-| Rv0678 | 522 | 13 | 25 | 650 | 32 | 756 |
-| atpE | 0 | 0 | 7 | 5 | 0 | 54 |
-| mmpL5 | 287 | 2 | 43 | 0 | 336 | 96,337 |
+| Rv0678 | 519 | 13 | 11 | 654 | 32 | 756 |
+| atpE | 0 | 0 | 0 | 12 | 0 | 54 |
+| mmpL5 | 286 | 2 | 42 | 0 | 336 | 96,337 |
 | pepQ | 15 | 0 | 2 | 11 | 1 | 754 |
 
 atpE is descriptive rather than inferential in this cohort: 10 solo isolates with
-an MIC. The Rv0678 stop-codon and in-frame-indel groups hold 5 isolates each and
-carry no fitted estimate anywhere in this work.
+an MIC. The Rv0678 gene-deletion, stop-codon and in-frame-indel groups hold 6, 5
+and 4 isolates, and none of the three carries a fitted estimate anywhere in this
+work.
+
+A deletion of most of the gene is recorded twice in v3.4.0, once as a fraction of
+the gene and once as the sequence removed, and the two rows describe one event.
+The counts above take the event once, which is why a sample whose only finding is
+such a deletion is a solo sample here rather than one carrying two variants.
 
 ### Isolates from one patient
 
@@ -121,13 +128,13 @@ Restricting to one isolate per patient leaves every effect where it was:
 
 | Comparison | Drug | All isolates | One per patient |
 | --- | --- | --- | --- |
-| Rv0678 loss of function | BDQ | OR 54.6 | OR 50.5 |
+| Rv0678 loss of function | BDQ | OR 50.9 | OR 46.9 |
 | Rv0678 substitution | BDQ | OR 23.6 | OR 21.4 |
 | Rv0678 loss of function | CFZ | OR 13.1 | OR 12.5 |
 | Rv0678 substitution | CFZ | OR 5.9 | OR 5.7 |
 
-The loss-of-function rows are restricted to isolates whose mmpL5 is intact, 110
-of the 153 carriers, because a loss-of-function variant in mmpL5 removes the
+The loss-of-function rows are restricted to isolates whose mmpL5 is intact, 116
+of the 159 carriers, because a loss-of-function variant in mmpL5 removes the
 efflux pump the repressor controls. The substitution rows need no such
 restriction: none of the 195 substitution carriers has an mmpL5 loss-of-function
 variant. Every odds ratio here is against the reference group by Fisher's exact
@@ -143,9 +150,9 @@ effects strengthen:
 
 | Comparison | Drug | All quality | HIGH only |
 | --- | --- | --- | --- |
-| Rv0678 loss of function | BDQ | OR 54.6 (n=110) | OR 80.3 (n=91) |
+| Rv0678 loss of function | BDQ | OR 50.9 (n=116) | OR 74.6 (n=96) |
 | Rv0678 substitution | BDQ | OR 23.6 (n=195) | OR 29.3 (n=157) |
-| Rv0678 loss of function | CFZ | OR 13.1 (n=110) | OR 11.3 (n=69) |
+| Rv0678 loss of function | CFZ | OR 13.1 (n=116) | OR 11.7 (n=71) |
 | Rv0678 substitution | CFZ | OR 5.9 (n=195) | OR 7.6 (n=142) |
 
 The same mmpL5 restriction applies to the loss-of-function rows. No effect rests
@@ -170,10 +177,11 @@ samples are missing every one, which is that block.
 
 Plate design carries a second association. UKMYC5 loses 135 of 6,346 bedaquiline
 rows, 2.13%, against 49 of 8,810 on UKMYC6, 0.56%; for clofazimine 131 of 6,348,
-2.06%, against 30 of 8,810, 0.34%. Held constant by site across the 8 sites that
-ran both designs, the Mantel-Haenszel odds ratio for UKMYC5 against UKMYC6 is
-4.89 (3.64 to 6.57) for bedaquiline and 8.34 (5.82 to 11.96) for clofazimine, so
-the design association is not the site association restated.
+2.06%, against 30 of 8,810, 0.34%. Eight sites ran both designs and six of them
+lost at least one row, and over those six the Mantel-Haenszel odds ratio for
+UKMYC5 against UKMYC6 is 4.89 (3.64 to 6.57) for bedaquiline and 8.34 (5.82 to
+11.96) for clofazimine, so the design association is not the site association
+restated.
 
 An apparent association between an uncallable gene and a missing MIC does not
 survive the same adjustment. Crude, for bedaquiline, 4.15% of the uncertain group
@@ -183,11 +191,12 @@ chi-square 4.8, p = 0.091, and clofazimine moves from p = 5.35e-05 to p = 0.366.
 
 The exclusion cannot move a fitted mean far, because a missing isolate acts only
 through the value it would have had, weighted 174 of 14,187 for bedaquiline and
-149 of 14,187 for clofazimine. The widest gap between any subset's fitted
-reference mean and the whole group's is 0.331 doublings for bedaquiline and 0.474
-for clofazimine, which move the whole-group mean by 0.004 and 0.005. At an
-implausible gap of 3 doublings the movement is 0.037 and 0.032, below the
-precision the means are reported to.
+149 of 14,187 for clofazimine. The widest gap between a site's fitted reference
+mean and the whole group's, over the sites carrying at least 100 placeable
+intervals, is 0.931 doublings for bedaquiline and 1.096 for clofazimine, both at
+site 14. A missing isolate differing from the fitted mean by that much would move
+the whole-group mean by 0.011 and 0.012. At an implausible gap of 3 doublings the
+movement is 0.037 and 0.032, below the precision the means are reported to.
 
 ## The MIC model
 
@@ -223,7 +232,8 @@ functions. Far out in a tail the two functions agree to most of their digits and
 subtracting them destroys the rest. The bedaquiline reference group holds 17
 intervals carrying a probability mass below 1e-08, the smallest 3.6e-09, which is
 enough for the subtraction to corrupt the gradient and stop the optimiser short
-of the maximum.
+of the maximum. The clofazimine group holds none below that floor, its smallest
+mass 3.8e-07, so the two drugs do not stress the arithmetic equally.
 
 Intervals on a group mean come from resampling clusters with replacement rather
 than isolates, for the reason given under "Clonal clustering".
@@ -231,19 +241,20 @@ than isolates, for the reason given under "Clonal clustering".
 ### Validation against planted parameters
 
 Simulating from known distributions and censoring the result onto the real UKMYC6
-bedaquiline ladder:
+bedaquiline ladder, 4,000 draws per row:
 
-| True mean | Fitted mean | Fitted sd | Naive median | Left-censored |
-| --- | --- | --- | --- | --- |
-| -5.00 | -4.96 | 1.00 | -4.06 | 2.4% |
-| -6.50 | -6.50 | 1.03 | -6.06 | 32.6% |
-| -7.50 | -7.49 | 1.22 | -6.97 | 66.8% |
-| -2.00 | -2.02 | 1.49 | -1.00 | 0.0% |
-| -4.00 | -3.97 | 0.80 | -3.06 | 0.1% |
+| True mean | Fitted mean | True sd | Fitted sd | Naive median | Left-censored |
+| --- | --- | --- | --- | --- | --- |
+| -5.0 | -5.03 | 1.0 | 1.00 | -4.06 | 2.5% |
+| -6.5 | -6.50 | 1.0 | 1.01 | -6.06 | 31.9% |
+| -7.5 | -7.52 | 1.2 | 1.18 | -6.97 | 67.9% |
+| -2.0 | -1.98 | 1.5 | 1.48 | -1.00 | 0.0% |
+| -4.0 | -4.01 | 0.8 | 0.79 | -3.06 | 0.0% |
 
-Standard deviations were recovered exactly in every case. The naive median is
-biased upward by half a doubling to a full doubling throughout, and at 66.8%
-censoring it sticks near the plate floor.
+Every mean is recovered within 0.03 doublings and every standard deviation
+within 0.02. The naive median is biased upward by half a doubling to a full
+doubling throughout, and at 67.9% censoring it sticks near the plate floor. The
+table is section 2 of `outputs/mic_model_report.txt`.
 
 ### The reference distributions
 
@@ -271,16 +282,16 @@ This is the argument for a per-variant layer rather than stopping at classes.
 
 ### What a binary call cannot express
 
-Within lineage4, clofazimine loss of function gives an odds ratio of 0.6 at
-p = 0.55, on 1 resistant isolate in 37. The MIC says otherwise: the reference
-mean is -4.54, the loss-of-function mean -3.44, a shift of 1.1 doublings whose
-interval, -3.92 to -2.96 on the group mean, does not touch the reference. The
-effect is there and lands about 2.4 doublings short of the clofazimine ECOFF, so
-almost nothing crosses it.
+Within lineage4, clofazimine loss of function gives an odds ratio of 1.1 at
+p = 0.94, on 2 resistant isolates in 42. The MIC says otherwise: the reference
+mean is -4.54, the loss-of-function mean -3.36, a shift of 1.2 doublings whose
+interval, -3.83 to -2.97 on the group mean, does not touch the reference. The
+effect is there and lands about 1.4 doublings short of the clofazimine ECOFF at
+0.25 mg/L, so almost nothing crosses it.
 
-Read across lineages, the clofazimine response to losing Rv0678 is a gradient of
-roughly two to one, 2.1 doublings in lineage2 and 2.2 in lineage3 against 1.1 in
-lineage4, where the odds ratios of 9.9, 13.4 and 0.6 suggested presence against
+Read across lineages, the clofazimine response to losing Rv0678 runs from 2.2
+doublings in lineage3 and 2.1 in lineage2 down to 1.2 in lineage4, where the
+site-adjusted odds ratios of 13.4, 10.2 and 1.1 suggested presence against
 absence. Lineage-stratified figures are in `outputs/mic_estimates.csv`, and the
 lineage contrast is confounded by site, treated under "Site and lineage".
 
@@ -307,22 +318,24 @@ isolates carrying a MIC for the drug.
 | Rv0678 frameshift | 148 | 25, 16.9% | 35.8 | 1.3e-27 | 35, 23.6% | 8.0 | 3.7e-18 |
 | Rv0678 substitution | 195 | 23, 11.8% | 23.6 | 6.1e-22 | 36, 18.5% | 5.9 | 5.2e-15 |
 | Rv0678 stop codon | 5 | 1, 20.0% | 44.1 | 0.028 | 2, 40.0% | 17.3 | 0.013 |
-| Rv0678 in-frame indel | 5 | 0 | 0.0 | 1 | 0 | 0.0 | 1 |
-| Rv0678 promoter | 82 | 1, 1.2% | 2.2 | 0.37 | 2, 2.4% | 0.6 | 0.77 |
+| Rv0678 gene deletion | 6 | 0 | 0.0 | 1 | 2, 33.3% | 13.0 | 0.019 |
+| Rv0678 in-frame indel | 4 | 0 | 0.0 | 1 | 0 | 0.0 | 1 |
+| Rv0678 promoter | 83 | 1, 1.2% | 2.2 | 0.38 | 2, 2.4% | 0.6 | 0.77 |
 | pepQ solo | 217 | 4, 1.8% | 3.3 | 0.038 | 16, 7.4% | 2.1 | 0.010 |
 | atpE solo | 10 | 1, 10.0% | 19.6 | 0.056 | 0 | 0.0 | 1 |
-| multiple variants | 20 | 1, 5.0% | 9.3 | 0.11 | 5, 25.0% | 8.6 | 7.0e-04 |
+| multiple variants | 14 | 1, 7.1% | 13.6 | 0.077 | 3, 21.4% | 7.1 | 0.014 |
 | excluded as uncertain | 289 | 35, 12.1% | 24.3 | 3.9e-32 | 60, 20.8% | 6.8 | 2.4e-26 |
 
-Five isolates support no inference, so the stop-codon and in-frame-indel rows are
-counts rather than estimates. They are shown because pooling them into a
-loss-of-function group is what the next table does, and a reader should see how
-little they weigh.
+Four, five and six isolates support no inference, so the in-frame-indel,
+stop-codon and gene-deletion rows are counts rather than estimates. They are
+shown because pooling the stop codons and the deletions into a loss-of-function
+group is what the next table does, and a reader should see how little they
+weigh.
 
 ### Promoter variants are not substitutions
 
 Rv0678 promoter variants show no effect on either drug: bedaquiline odds ratio 2.2
-at p = 0.37, clofazimine 0.6 at p = 0.77. Pooling them with substitutions, which
+at p = 0.38, clofazimine 0.6 at p = 0.77. Pooling them with substitutions, which
 an earlier grouping did, dilutes a real effect with a group that has none. On the
 MIC scale they move the bedaquiline MIC downward by 1.6 doublings, which is
 treated under "The per-variant layer": that shift belongs to one variant rather
@@ -335,13 +348,13 @@ Restricted to isolates whose mmpL5 is intact, against the same reference group:
 | Drug | Group | Isolates | Resistant | Odds ratio | p |
 | --- | --- | --- | --- | --- | --- |
 | BDQ | Rv0678 substitution | 195 | 23, 11.8% | 23.6 | 6.1e-22 |
-| BDQ | Rv0678 loss of function | 110 | 26, 23.6% | 54.6 | 1.1e-32 |
+| BDQ | Rv0678 loss of function | 116 | 26, 22.4% | 50.9 | 5.2e-32 |
 | CFZ | Rv0678 substitution | 195 | 36, 18.5% | 5.9 | 5.2e-15 |
-| CFZ | Rv0678 loss of function | 110 | 37, 33.6% | 13.1 | 6.3e-25 |
+| CFZ | Rv0678 loss of function | 116 | 39, 33.6% | 13.1 | 3.7e-26 |
 
 Loss of function against substitution directly, rather than each against the
-reference group: odds ratio 2.3 at p = 0.0091 for bedaquiline and 2.2 at
-p = 0.0034 for clofazimine. Losing the repressor raises resistance further than
+reference group: odds ratio 2.16 at p = 0.0158 for bedaquiline and 2.24 at
+p = 0.0038 for clofazimine. Losing the repressor raises resistance further than
 changing it, on both drugs, and clofazimine shows the same ordering on a shallower
 gradient. These are unadjusted for site and for clonal relatedness, both of which
 are treated below.
@@ -357,12 +370,16 @@ them is what clonal inheritance of a real deletion looks like; a coverage artefa
 would give ragged fractions. Coverage and depth of the deleted isolates are close
 to everything else, median 99.27% against 99.30% and 71.3 against 90.0.
 
-Six of the 13 carry an MIC and none is bedaquiline resistant. Measured against
-the loss-of-function group they belong to, 26 resistant of 110 at 23.6%, the
-probability of seeing zero resistant among six is 0.20 and Fisher's exact test
-gives p = 0.34. Against the frameshift group alone, 25 of 148 at 16.9%, the
-figures are 0.33 and p = 0.59. Either way the deletions are underpowered rather
-than anomalous.
+Six of the 13 carry an MIC, and those six are the Rv0678 gene deletion group in
+the tables above. None is bedaquiline resistant. Measured against the other 110
+isolates of the loss-of-function group, 26 resistant at 23.6%, the probability of
+seeing zero resistant among six is 0.20 and Fisher's exact test gives p = 0.34.
+Against the frameshift group alone, 25 of 148 at 16.9%, the figures are 0.33 and
+p = 0.59. On bedaquiline the deletions are underpowered rather than anomalous.
+
+On clofazimine two of the six are resistant, 33.3% against 33.6% in the other
+110, with an odds ratio of 0.99 and p = 1.0. There the deletions sit on the rate
+of the group they belong to.
 
 ## Site and lineage
 
@@ -386,28 +403,30 @@ Rv0678 loss of function against the reference group, within lineage, unadjusted:
 
 | Lineage | Carriers | BDQ resistant | BDQ OR | BDQ p | CFZ resistant | CFZ OR | CFZ p |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| lineage2 | 61 | 16 | 63.7 | 6.8e-21 | 31 | 19.4 | 1.7e-23 |
+| lineage2 | 62 | 16 | 62.3 | 9.1e-21 | 32 | 20.0 | 1.8e-24 |
 | lineage3 | 10 | 7 | 324.6 | 1.6e-12 | 4 | 14.0 | 8.5e-04 |
-| lineage4 | 37 | 2 | 9.6 | 0.022 | 1 | 1.0 | 1.0 |
+| lineage4 | 42 | 2 | 8.4 | 0.028 | 2 | 1.8 | 0.33 |
 
-The strata disagree, homogeneity p = 0.0013 on both drugs across these three
-lineages, so a single pooled odds ratio would summarise incompatible things. That
-is the reason nothing in this work reports one.
+The strata disagree across these three lineages, homogeneity p = 0.00065 for
+bedaquiline and 0.0014 for clofazimine, so a single pooled odds ratio would
+summarise incompatible things. That is the reason nothing in this work reports
+one.
 
 Holding site constant inside each lineage:
 
 | Lineage | BDQ, site held constant | CFZ, site held constant |
 | --- | --- | --- |
-| lineage2 | 60.7 (24.0 to 153.9) | 9.9 (5.6 to 17.5) |
+| lineage2 | 59.3 (23.3 to 150.5) | 10.2 (5.8 to 18.0) |
 | lineage3 | 255.1 (46.0 to 1414.5) | 13.4 (3.2 to 56.1) |
-| lineage4 | 19.2 (3.8 to 97.4) | 0.6 (0.1 to 4.2) |
+| lineage4 | 17.6 (3.5 to 88.0) | 1.1 (0.3 to 4.5) |
 
-For clofazimine, lineage4's interval does not overlap lineage2's, so that
-difference is not explained by site. For bedaquiline every interval overlaps every
-other, so the apparent lineage difference does not survive adjustment and is not
-reported as a finding. On the MIC scale the surviving clofazimine difference is a
-gradient of roughly two to one rather than presence against absence, which is
-treated under "What a binary call cannot express".
+For clofazimine, lineage4's interval reaches 4.5 and lineage2's starts at 5.8, so
+the two do not overlap and that difference is not explained by site. For
+bedaquiline every interval overlaps every other, so the apparent lineage
+difference does not survive adjustment and is not reported as a finding. On the
+MIC scale the surviving clofazimine difference is 1.3 doublings between the two
+lineage means, -2.07 against -3.36, which is treated under "What a binary call
+cannot express".
 
 ## Clonal clustering
 
@@ -427,14 +446,15 @@ inflating it.
 | --- | --- | --- | --- | --- |
 | reference | 14,187 | 14,187 | 1.00 | 1 |
 | Rv0678 frameshift | 148 | 60 | 2.47 | 41 |
-| Rv0678 promoter | 82 | 15 | 5.47 | 41 |
+| Rv0678 promoter | 83 | 16 | 5.19 | 41 |
 | Rv0678 substitution | 195 | 111 | 1.76 | 16 |
 | pepQ solo | 217 | 87 | 2.49 | 42 |
 | excluded as uncertain | 289 | 275 | 1.05 | 15 |
-| multiple variants | 20 | 9 | 2.22 | 8 |
+| multiple variants | 14 | 7 | 2.00 | 8 |
 | atpE solo | 10 | 10 | 1.00 | 1 |
+| Rv0678 gene deletion | 6 | 2 | 3.00 | 5 |
 | Rv0678 stop codon | 5 | 5 | 1.00 | 1 |
-| Rv0678 in-frame indel | 5 | 5 | 1.00 | 1 |
+| Rv0678 in-frame indel | 4 | 4 | 1.00 | 1 |
 
 The largest clusters carrying an Rv0678 variant:
 
@@ -470,9 +490,9 @@ its value is that it shows whether an effect survives when a clone gets one vote
 
 | Drug | Comparison | Isolates | Clusters | Isolate level | Cluster-robust | Draws above 1 |
 | --- | --- | --- | --- | --- | --- | --- |
-| BDQ | Rv0678 loss of function | 110 | 63 | 54.6 | 68.1 (35.2 to 131.9) | 100% |
+| BDQ | Rv0678 loss of function | 116 | 65 | 50.9 | 61.1 (31.5 to 118.3) | 100% |
 | BDQ | Rv0678 substitution | 195 | 111 | 23.6 | 33.0 (18.5 to 58.6) | 100% |
-| CFZ | Rv0678 loss of function | 110 | 63 | 13.1 | 7.6 (4.5 to 12.7) | 100% |
+| CFZ | Rv0678 loss of function | 116 | 65 | 13.1 | 7.7 (4.7 to 12.6) | 100% |
 | CFZ | Rv0678 substitution | 195 | 111 | 5.9 | 6.5 (4.1 to 10.2) | 100% |
 
 Every effect survives all three treatments. Where the collapsed estimate exceeds
@@ -480,24 +500,27 @@ the isolate-level one, the large clusters are the susceptible ones, so clonality
 was biasing those effects downward rather than upward.
 
 The one-per-cluster column reports the fraction of draws above 1 rather than a
-median, because at 200 draws the median carries Monte Carlo noise: across five
-seeds the bedaquiline loss-of-function median moves between 63.0 and 65.7, and for
-the lineage4 comparison below it moves between 0.00 and 0.79. The fraction above 1
-is stable across seeds for every comparison here.
+median, because at 200 draws the median carries Monte Carlo noise. Across five
+seeds the bedaquiline loss-of-function median moves between 57.8 and 63.1 and the
+clofazimine one between 6.3 and 6.4, while both are above 1 in every draw of every
+seed. For the lineage4 clofazimine comparison below, the median holds at 0.77
+across all five seeds and the fraction above 1 moves between 6% and 12%. Section 5
+of `outputs/cluster_report.txt` carries the sweep.
 
 The lineage contrast under clustering, clofazimine loss of function:
 
 | Lineage | Clusters | Isolate level | Cluster-robust | Draws above 1 |
 | --- | --- | --- | --- | --- |
-| lineage2 | 30 | 19.4 | 10.5 (5.8 to 19.0) | 100% |
+| lineage2 | 31 | 20.0 | 10.8 (6.0 to 19.4) | 100% |
 | lineage3 | 8 | 14.0 | 11.7 (4.0 to 34.4) | 100% |
-| lineage4 | 23 | 1.0 | 0.6 (0.1 to 3.9) | 0% |
+| lineage4 | 24 | 1.8 | 1.1 (0.3 to 4.1) | 9% |
 
-lineage2 is above 1 in every draw and lineage4 in none, so the clofazimine lineage
-difference is not an artefact of clonal expansion.
+lineage2 is above 1 in every draw and lineage4 in 9% of them, 6% to 12% across
+the five seeds, so the clofazimine lineage difference is not an artefact of clonal
+expansion.
 
-The effective sample sizes that every interval in this work rests on are 110
-isolates in 63 clusters for loss of function and 195 in 111 for substitution.
+The effective sample sizes that every interval in this work rests on are 116
+isolates in 65 clusters for loss of function and 195 in 111 for substitution.
 
 ## The per-variant layer
 
@@ -508,11 +531,13 @@ have a disrupted mmpL5, and a fitted shift with an interval where the independen
 evidence supports one. Only solo isolates enter a row, and mmpL5 is never the
 subject of a row.
 
-215 distinct variants across 662 solo isolates in 293 clusters: 136 Rv0678
-variants on 435 isolates in 196 clusters, 69 pepQ variants on 217 isolates in 87
+217 distinct variants across 668 solo isolates in 295 clusters: 138 Rv0678
+variants on 441 isolates in 198 clusters, 69 pepQ variants on 217 isolates in 87
 clusters, and 10 atpE variants on 10 isolates in 10 clusters.
 
-151 of the 215 are carried by a single isolate, and 180 rest on a single cluster.
+152 of the 217 are carried by a single isolate, and 182 rest on a single cluster.
+By class: 160 substitutions, 34 frameshifts, 12 promoter variants, 5 stop codons,
+4 in-frame indels and 2 gene deletions.
 
 ### What is withheld, and why
 
@@ -541,7 +566,7 @@ the reason given under "The reference distributions".
 | Rv0678 138_ins_g | frameshift | 18 | 7 | 5 | 5 | 2.6 | 1.6 to 3.3 | 2.6 | 1.0 to 3.4 |
 | pepQ P69L | substitution | 18 | 5 | 5 | 1 | -0.2 | -0.4 to 0.1 | 0.1 | -0.5 to 0.4 |
 
-Four of 215. That is what this dataset supports at variant resolution, and no
+Four of 217. That is what this dataset supports at variant resolution, and no
 amount of further analysis changes it.
 
 ### A variant the second rule catches
@@ -635,10 +660,14 @@ carries three decimals and the plain fits beside these.
 
 | Group | Isolates | Clusters | BDQ shift | 95% | CFZ shift | 95% |
 | --- | --- | --- | --- | --- | --- | --- |
-| minor loss of function | 40 | 36 | 1.9 | 1.3 to 2.5 | 1.6 | 1.1 to 2.0 |
+| minor loss of function | 40 | 36 | 1.9 | 1.3 to 2.5 | 1.6 | 1.0 to 2.1 |
 | minor substitution | 23 | 22 | 1.3 | 0.7 to 1.9 | 1.0 | 0.4 to 1.5 |
-| major loss of function | 153 | 65 | 1.0 | -0.3 to 2.2 | 0.9 | 0.3 to 1.7 |
-| major substitution | 195 | 111 | 1.3 | 0.8 to 1.7 | 1.1 | 0.8 to 1.4 |
+| major loss of function | 159 | 67 | 1.0 | -0.2 to 2.2 | 1.0 | 0.3 to 1.7 |
+| major substitution | 195 | 111 | 1.3 | 0.9 to 1.7 | 1.1 | 0.8 to 1.4 |
+
+The isolate and cluster counts are the bedaquiline ones. One substitution carrier
+has no clofazimine MIC, so the clofazimine figures in that row rest on 194
+isolates in 110 clusters.
 
 Site is held constant because 84 of the 139 Rv0678 minor-allele isolates come
 from the one site enriched for bedaquiline resistance by design, and the sites
@@ -649,12 +678,65 @@ the plain fits in the released table differ by the site adjustment alone.
 Every minor-allele interval excludes zero on both drugs. The minor and major
 intervals overlap, so what the data supports is a shift of the same size for a
 variant detected in a minority of reads as for the same class carried in every
-read. The bedaquiline major loss-of-function interval crosses zero on 153
-isolates because those isolates sit in 65 clusters, 41 of them one outbreak, and
-resampling clusters gives that outbreak one vote.
+read. The bedaquiline major loss-of-function interval crosses zero on 159
+isolates because those isolates sit in 67 clusters, one of which holds 41 of them,
+and resampling clusters gives that outbreak one vote.
 
 CRyPTIC report minor alleles as Susceptible, so this is a quantity the catalogue
 layer discards by construction.
+
+### Samples carrying more than one minor allele
+
+A sample with two detected minor alleles at Rv0678 cannot attribute its MIC to
+either, which is why the estimates above exclude it. It is still a sample with no
+wild-type assertion available at the gene and no major allele to explain it, so
+the group is worth measuring on its own terms.
+
+289 samples across all 54,057 genomes carry more than one minor allele at Rv0678.
+257 of them carry nothing else in the three genes, and 49 of those carry a
+placeable MIC. That last figure is the analysable group.
+
+Those 49 samples fall into 49 clusters, one each. They carry no defining
+major-allele mutation to share, so clonal expansion inflates nothing here, which
+is not true of any other carrier group in this work. 38 carry two alleles, 9
+carry three and 2 carry four. All 111 alleles sit at distinct positions, in every
+one of the samples, so no two compete at a locus. 48 of the 49 carry at least one
+loss-of-function allele and 19 carry nothing else.
+
+| Drug | Subset | Isolates | Resistant | Reference |
+| --- | --- | --- | --- | --- |
+| BDQ | all | 49 | 9, 18.4% | 0.57% |
+| BDQ | two alleles | 38 | 7, 18.4% | 0.57% |
+| BDQ | three or more | 11 | 2, 18.2% | 0.57% |
+| CFZ | all | 49 | 19, 38.8% | 3.75% |
+| CFZ | two alleles | 38 | 15, 39.5% | 3.75% |
+| CFZ | three or more | 11 | 4, 36.4% | 3.75% |
+
+The reference rates are over the reference samples carrying a placeable MIC for
+that drug, 14,013 and 14,038, rather than all 14,187. Carrying three or more
+alleles is no worse than carrying two on either drug.
+
+With site held constant, in the same joint regression as the groups above, the
+shift is 1.8 doublings for bedaquiline and 1.3 for clofazimine, against 1.9 and
+1.6 for a single minor loss-of-function allele and 1.0 on both drugs for a
+major-allele loss of function. Adding this group to that regression moves every other group's
+estimate by at most 0.002 doublings.
+
+### A reading the read fractions do not support
+
+The read fractions of a sample's alleles sum to a median of 0.923, which invites
+reading the remainder as a wild-type share: several sub-populations, each
+carrying a different variant, with little wild type left. The fractions do not
+support it.
+
+12 of the 49 samples sum above 1.0, to a maximum of 1.077, which no partition can
+do. Among the 38 two-allele samples the two fractions differ by a median of 0.309
+and by more than 0.3 in 20 of them, so the alleles mostly do not sit at
+comparable shares. FRS is a ratio of supporting reads to coverage at one
+position, and coverage differs between positions, so a sum across positions has
+no common denominator and is bounded by nothing. The summed fraction is reported
+in `outputs/multi_allele_counts.csv` as a measurement and carries no inference
+about population structure.
 
 ### A prediction that failed
 
@@ -755,14 +837,14 @@ sequence behaves, and counting it otherwise would flatter the rule.
 
 | Drug | Rule | Sensitivity | Specificity | PPV |
 | --- | --- | --- | --- | --- |
-| BDQ | major variant in the three genes | 34.5 (25.1 to 42.8) | 95.7 (94.3 to 96.8) | 8.4 (5.8 to 11.5) |
-| BDQ | any Rv0678 major variant | 31.6 (23.7 to 40.0) | 97.2 (95.9 to 98.1) | 11.4 (7.7 to 17.2) |
-| BDQ | Rv0678 loss of function | 16.4 (8.8 to 23.7) | 99.1 (98.5 to 99.5) | 16.6 (8.2 to 28.9) |
-| BDQ | major variant or detected minor allele | 52.6 (44.9 to 61.0) | 94.6 (93.2 to 95.8) | 10.2 (7.6 to 12.9) |
-| CFZ | major variant in the three genes | 15.2 (11.1 to 19.5) | 95.8 (94.7 to 96.9) | 14.8 (11.1 to 19.8) |
-| CFZ | any Rv0678 major variant | 12.7 (9.2 to 16.2) | 97.3 (96.1 to 98.2) | 18.4 (13.2 to 26.1) |
-| CFZ | Rv0678 loss of function | 6.2 (3.1 to 9.5) | 99.1 (98.4 to 99.6) | 24.9 (12.6 to 41.9) |
-| CFZ | major variant or detected minor allele | 22.2 (18.5 to 27.2) | 94.9 (93.7 to 95.8) | 17.2 (13.8 to 20.8) |
+| BDQ | major variant in the three genes | 34.5 (27.0 to 43.4) | 95.7 (94.1 to 96.8) | 8.4 (5.8 to 11.8) |
+| BDQ | any Rv0678 major variant | 31.6 (24.2 to 39.8) | 97.2 (96.0 to 98.2) | 11.4 (8.5 to 17.0) |
+| BDQ | Rv0678 loss of function | 16.4 (9.6 to 24.7) | 99.1 (98.4 to 99.5) | 16.6 (8.9 to 29.1) |
+| BDQ | major variant or detected minor allele | 52.6 (44.6 to 61.4) | 94.6 (93.4 to 95.6) | 10.2 (7.9 to 13.0) |
+| CFZ | major variant in the three genes | 15.2 (11.0 to 19.7) | 95.8 (94.6 to 97.0) | 14.8 (10.9 to 18.9) |
+| CFZ | any Rv0678 major variant | 12.7 (8.9 to 17.3) | 97.3 (96.2 to 98.2) | 18.4 (12.5 to 25.8) |
+| CFZ | Rv0678 loss of function | 6.2 (3.5 to 9.6) | 99.1 (98.5 to 99.5) | 24.9 (13.5 to 41.7) |
+| CFZ | major variant or detected minor allele | 22.2 (18.1 to 27.0) | 94.9 (93.5 to 96.0) | 17.2 (13.6 to 20.7) |
 
 Denominators are 14,972 bedaquiline isolates in 14,573 clusters with 171
 resistant, and 14,997 clofazimine isolates in 14,598 clusters with 683 resistant:
@@ -791,6 +873,70 @@ in the indeterminate tier because uncertainty takes precedence there, while the
 rule calls them. For clofazimine it is 104 called against 96 tiered, with 8 in
 both states. Every cell of every confusion matrix was reproduced by a route that
 reads the source tables directly and uses none of this project's cohort code.
+
+### The same rules at other cut-offs
+
+The ECOFF is one concentration among those the plates tested, and a rule that
+looks weak against it can look different against another.
+`outputs/prediction_thresholds.csv` carries all four rules at every usable
+cut-off: seven for bedaquiline, 0.015 to 1 mg/L, and six for clofazimine, 0.06 to
+2 mg/L.
+
+A cut-off is usable only where every isolate's position relative to it is
+determinate. Below the highest of the two designs' lowest rungs, a left-censored
+reading on the design with the lower floor lies on neither side of it; above the
+lowest of the two designs' highest rungs, a right-censored reading lies on
+neither side either. A concentration that is a rung on both designs is inside
+both bounds, so the shared rungs are exactly the usable cut-offs, and no isolate
+is dropped at any of them.
+
+Position is read from the censoring interval rather than from the reported
+number: an interval lies above the cut-off when its lower bound reaches it, and
+at or below when its upper bound does not exceed it. At the ECOFF that rule and
+CRyPTIC's own resistant or susceptible call agree on all 14,972 bedaquiline and
+14,997 clofazimine isolates, with no disagreement, which is an independent check
+on the censoring placement.
+
+The broadest rule, a major variant or a detected minor allele, across the
+bedaquiline range:
+
+| Cut-off, mg/L | Above it | Sensitivity | Specificity | PPV |
+| --- | --- | --- | --- | --- |
+| 0.015 | 11446 | 6.0 (5.0 to 7.2) | 94.5 (90.9 to 97.3) | 77.9 (67.9 to 88.0) |
+| 0.03 | 6529 | 8.5 (7.0 to 10.1) | 96.1 (94.5 to 97.4) | 62.7 (53.7 to 71.9) |
+| 0.06 | 1614 | 21.9 (18.8 to 24.7) | 96.0 (94.8 to 97.0) | 40.1 (34.4 to 45.9) |
+| 0.12 | 508 | 45.7 (39.4 to 51.1) | 95.5 (94.0 to 96.6) | 26.2 (21.2 to 33.2) |
+| 0.25 | 171 | 52.6 (44.6 to 61.4) | 94.6 (93.4 to 95.6) | 10.2 (7.9 to 13.0) |
+| 0.5 | 79 | 27.9 (18.0 to 39.8) | 94.2 (92.4 to 95.2) | 2.5 (1.6 to 3.7) |
+| 1 | 33 | 15.2 (3.7 to 28.2) | 94.1 (92.7 to 95.2) | 0.6 (0.1 to 1.0) |
+
+And across the clofazimine range:
+
+| Cut-off, mg/L | Above it | Sensitivity | Specificity | PPV |
+| --- | --- | --- | --- | --- |
+| 0.06 | 5599 | 9.1 (7.6 to 11.1) | 96.0 (94.6 to 97.1) | 58.0 (51.3 to 64.7) |
+| 0.12 | 2186 | 13.8 (11.7 to 16.8) | 95.5 (94.2 to 96.4) | 34.2 (29.1 to 39.2) |
+| 0.25 | 683 | 22.2 (18.1 to 27.0) | 94.9 (93.5 to 96.0) | 17.2 (13.6 to 20.7) |
+| 0.5 | 238 | 31.5 (24.5 to 38.3) | 94.5 (93.3 to 95.7) | 8.5 (6.3 to 11.2) |
+| 1 | 81 | 35.8 (22.5 to 48.2) | 94.3 (93.0 to 95.4) | 3.3 (1.9 to 4.8) |
+| 2 | 30 | 26.7 (10.7 to 45.0) | 94.2 (92.9 to 95.3) | 0.9 (0.3 to 1.8) |
+
+The ECOFF sits at 0.25 mg/L in both tables. Two things are visible there that the
+single-cut-off view hides.
+
+Sensitivity on bedaquiline peaks at the ECOFF, at 52.6%, and falls away on both
+sides: 6.0% at 0.015 mg/L, where 11,446 of the 14,972 isolates sit above the
+cut-off and the rules call a fixed few hundred, and 15.2% at 1 mg/L, where only
+33 isolates remain above it and most are ones no rule calls. Specificity moves
+between 94.1% and 96.1% across the whole range, so the isolates these rules call
+barely track the cut-off.
+
+Clofazimine peaks elsewhere. Sensitivity climbs from 9.1% at 0.06 mg/L to 35.8%
+at 1 mg/L, four doublings above the ECOFF, and falls to 26.7% only at the top of
+the range where 30 isolates remain. The genotype accounts for the highest
+clofazimine MICs better than for those just over the breakpoint, where the ECOFF
+figure of 22.2% is measured. That asymmetry between the two drugs is what a
+single cut-off cannot express.
 
 ## The pre-registered test
 
@@ -853,23 +999,30 @@ estimate covers in 84%, and the discovery confidence interval covers in 74%.
 `docs/PRE_REGISTRATION.md` was committed before the test ran, and `validate.py`
 refuses to run if that file is absent, uncommitted or modified.
 
-Rv0678 loss of function against the reference group, bedaquiline, on 22 held-out
-isolates in 18 clusters:
+Rv0678 loss of function against the reference group, bedaquiline, on 23 held-out
+isolates in 19 clusters:
 
 | Prediction | Quantity | Predicted | Observed | Verdict |
 | --- | --- | --- | --- | --- |
-| P1a | Odds ratio | 17.50 to 278.00 | 87.45 | Supported |
+| P1a | Odds ratio | 17.50 to 278.00 | 81.99 | Supported |
 | P1b | MIC shift, doublings | 1.60 to 3.22 | 2.55 | Supported |
 
-P1a: 22 held-out isolates in 18 clusters with 7 resistant, against 1,884 reference
+P1a: 23 held-out isolates in 19 clusters with 7 resistant, against 1,884 reference
 isolates with 10 resistant. Discovery estimate 73.0, smallest detectable odds
-ratio 27.4, observed 87.5 with its own interval 20.2 to 280.6.
+ratio 27.4, observed 82.0 with its own interval 21.2 to 296.5.
 
-P1b: reference mean -5.17, group mean -2.62, observed shift 2.55 doublings.
+P1b: reference mean -5.17, group mean -2.61, observed shift 2.55 doublings.
 Discovery estimate 2.43, smallest detectable shift 1.00 doublings, and the
-observed shift carries its own interval of 1.62 to 3.08.
+observed shift carries its own interval of 1.93 to 3.11.
 
-Two of two supported. Both concern the same comparison on the same 22 isolates, so
+The predicted ranges, the discovery estimates and the smallest detectable effects
+are the registered ones, read out of the committed pre-registration. That document
+records 22 held-out isolates in 18 clusters, which is what the classification in
+use when it was committed gave; the corrected classification puts 23 in 19 in the
+same held-out half, which is where the observed figures above come from. Both
+observed values fall inside the registered ranges either way.
+
+Two of two supported. Both concern the same comparison on the same 23 isolates, so
 this is one replication rather than two independent ones, and the held-out sample
 is small enough that its own intervals are wide.
 
@@ -893,13 +1046,15 @@ is small enough that its own intervals are wide.
    transmission analysis would cluster on genomic distance, which needs the full
    variant table and more compute than this project has. The approximation merges
    unrelated isolates and so understates the evidence rather than inflating it.
-7. The per-variant layer reaches 4 variants of 215. The rest carry counts and no
-   shift, 180 of them resting on a single cluster. A quantitative resource built
+7. The per-variant layer reaches 4 variants of 217. The rest carry counts and no
+   shift, 182 of them resting on a single cluster. A quantitative resource built
    on this dataset is a resource about a handful of variants and a large amount of
    carefully bounded ignorance.
 8. Variant naming here is not interoperable with the WHO catalogue or
    TB-Profiler, because HGVS normalisation is not implemented, so the per-variant
    table cannot yet be joined to either by variant name.
-9. Delamanid and linezolid are out of scope. Delamanid is 60.8% left-censored with
-   43.7% of its resistant isolates at the plate ceiling, and linezolid offers one
-   to two measurable dilutions above its ECOFF.
+9. Delamanid and linezolid are out of scope. In this cohort delamanid is 61.8%
+   left-censored with 43.7% of its resistant isolates at the plate ceiling, and
+   linezolid's plates carry one tested concentration above the breakpoint on
+   UKMYC5 and two on UKMYC6, with 32.7% of its resistant isolates off the top of
+   the plate. Section 6 of `outputs/audit_report.txt` carries both profiles.

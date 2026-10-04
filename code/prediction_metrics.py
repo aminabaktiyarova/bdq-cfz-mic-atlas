@@ -38,6 +38,12 @@ sharing a site, a sublineage and a mutation are one event observed many times.
 Outputs:
   outputs/prediction_metrics.txt
   outputs/prediction_metrics.csv
+  outputs/prediction_thresholds.csv
+
+The ECOFF is one cut-off among the tested concentrations, and a rule that looks
+weak against it may look different against another. The same four rules are
+therefore also evaluated at every concentration shared by both plate designs,
+which is where each isolate's position relative to the cut-off is determinate.
 """
 
 import sys
@@ -47,13 +53,19 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import cohort  # noqa: E402
 from cluster_adjust import add_clusters  # noqa: E402
+from mic_model import concentration_series, place_mics  # noqa: E402
 
 REPORT = Path("outputs/prediction_metrics.txt")
 TABLE = Path("outputs/prediction_metrics.csv")
+THRESHOLDS = Path("outputs/prediction_thresholds.csv")
 
 BOOTSTRAPS = 400
 SEED = 20260101
 RULES = ["major variant", "Rv0678 any", "Rv0678 loss", "major or minor"]
+# The concentration the ECOFF sits at, in mg/L, for both plate designs. An
+# isolate is resistant when its MIC exceeds it, which on a doubling ladder means
+# reaching the next rung up.
+ECOFF = {"BDQ": 0.25, "CFZ": 0.25}
 
 _lines = []
 
@@ -61,6 +73,19 @@ _lines = []
 def say(text=""):
     print(text)
     _lines.append(text)
+
+
+def stream(name):
+    """A generator seeded by name.
+
+    Each interval draws from its own stream, so a figure does not depend on
+    which figures were computed before it. The ECOFF row of the sweep and the
+    row for the same rule in the headline table are keyed identically, so the
+    two tables carry one interval for one quantity rather than two.
+    """
+    import numpy as np
+
+    return np.random.default_rng([SEED] + [ord(letter) for letter in name])
 
 
 def rule_flags(mutations, index):
@@ -153,8 +178,9 @@ def cluster_interval(frame, called_column, resistant_column, rng, draws=BOOTSTRA
     return intervals
 
 
-def evaluate(frame, flags, drug, rng):
-    """Every rule against one drug, on the samples carrying a MIC for it."""
+def evaluate(frame, flags, drug):
+    """Every rule against one drug at the ECOFF, on the samples carrying a MIC
+    for it."""
     subset = frame[frame[f"MIC_{drug}"].notna()].copy()
     for rule in RULES:
         subset[rule] = flags[rule].reindex(subset.index).fillna(False)
@@ -164,7 +190,8 @@ def evaluate(frame, flags, drug, rng):
     for rule in RULES:
         counts = confusion(subset[rule], subset[resistant])
         values = metrics(counts)
-        intervals = cluster_interval(subset, rule, resistant, rng)
+        intervals = cluster_interval(
+            subset, rule, resistant, stream(f"{drug} {rule} {ECOFF[drug]:g}"))
         record = {"drug": drug, "rule": rule, "isolates": len(subset),
                   "clusters": subset.CLUSTER.nunique(),
                   "resistant": int(subset[resistant].sum()), **counts}
@@ -174,6 +201,88 @@ def evaluate(frame, flags, drug, rng):
             record[f"{key}_low"] = round(interval[0], 4) if interval else None
             record[f"{key}_high"] = round(interval[1], 4) if interval else None
         records.append(record)
+    return records
+
+
+def shared_thresholds(series, drug):
+    """The tested concentrations present on every plate design for this drug.
+
+    A cut-off is usable only where every isolate's position relative to it is
+    determinate. Below the highest of the designs' lowest rungs, a left-censored
+    reading on the design with the lower floor sits on neither side of the
+    cut-off; above the lowest of the designs' highest rungs, a right-censored
+    reading sits on neither side either. A concentration that is a rung on every
+    design is inside both bounds by construction, so the shared rungs are exactly
+    the usable cut-offs.
+
+    Concentrations are matched within 5%, as mic_bounds matches them, because
+    CRyPTIC label them as rounded values.
+    """
+    ladders = [concentrations for (_, code), concentrations in series.items()
+               if code == drug]
+    if len(ladders) < 2:
+        return list(ladders[0]) if ladders else []
+    shared = []
+    for candidate in ladders[0]:
+        if all(any(abs(rung - candidate) / candidate < 0.05 for rung in ladder)
+               for ladder in ladders[1:]):
+            shared.append(candidate)
+    return shared
+
+
+def above_threshold(lower, upper, cut):
+    """Whether each interval lies above a cut-off, and whether that is
+    determinate.
+
+    The MIC is known only as an interval. It lies above the cut-off when its
+    lower bound reaches it, and at or below when its upper bound does not exceed
+    it. Anything else is a reading the plate cannot place either side.
+    """
+    import numpy as np
+
+    lower = np.asarray(lower, dtype=float)
+    upper = np.asarray(upper, dtype=float)
+    above = lower >= cut
+    at_or_below = upper <= cut
+    return above, above | at_or_below
+
+
+def sweep(frame, flags, drug, thresholds, draws=BOOTSTRAPS):
+    """Every rule against every cut-off, rather than against the ECOFF alone."""
+    import numpy as np
+
+    subset = frame[frame[f"MIC_{drug}"].notna()].copy()
+    for rule in RULES:
+        subset[rule] = flags[rule].reindex(subset.index).fillna(False)
+
+    records = []
+    for concentration in thresholds:
+        cut = float(np.log2(concentration))
+        above, determinate = above_threshold(
+            subset[f"lower_{drug}"], subset[f"upper_{drug}"], cut)
+        usable = subset[determinate].copy()
+        usable["above"] = above[determinate]
+        for rule in RULES:
+            counts = confusion(usable[rule], usable["above"])
+            values = metrics(counts)
+            intervals = cluster_interval(
+                usable, rule, "above",
+                stream(f"{drug} {rule} {concentration:g}"), draws=draws)
+            record = {"drug": drug, "rule": rule,
+                      "threshold_mg_L": concentration,
+                      "threshold_log2": round(cut, 3),
+                      "is_ecoff": bool(
+                          abs(concentration - ECOFF[drug]) / ECOFF[drug] < 0.05),
+                      "isolates": len(usable),
+                      "indeterminate": int((~determinate).sum()),
+                      "clusters": usable.CLUSTER.nunique(),
+                      "above_threshold": int(usable["above"].sum()), **counts}
+            for key, value in values.items():
+                record[key] = round(value, 4) if value is not None else None
+                interval = intervals[key]
+                record[f"{key}_low"] = round(interval[0], 4) if interval else None
+                record[f"{key}_high"] = round(interval[1], 4) if interval else None
+            records.append(record)
     return records
 
 
@@ -190,14 +299,22 @@ def main():
     frame = add_clusters(cohort.assemble(status), mutations)
     flags = rule_flags(mutations, frame.index)
 
+    series, _, _ = concentration_series()
+    for drug in cohort.DRUGS:
+        lower, upper, _, off_series = place_mics(
+            frame[f"MIC_{drug}"], frame[f"PLATEDESIGN_{drug}"], series, drug)
+        if off_series:
+            raise ValueError(f"{drug} MICs off the tested series: {off_series[:5]}")
+        frame[f"lower_{drug}"] = lower
+        frame[f"upper_{drug}"] = upper
+
     say("\nIsolates each rule calls, across the whole cohort:")
     for rule in RULES:
         say(f"  {rule:16s} {int(flags[rule].sum()):,} of {len(frame):,}")
 
-    rng = np.random.default_rng(SEED)
     records = []
     for drug in cohort.DRUGS:
-        records.extend(evaluate(frame, flags, drug, rng))
+        records.extend(evaluate(frame, flags, drug))
     table = pd.DataFrame(records)
 
     for drug in cohort.DRUGS:
@@ -225,10 +342,53 @@ def main():
     say("\nThe predictive values describe this collection, whose resistance is")
     say("concentrated at one site by design, and transfer to no other.")
 
+    say("\n" + "=" * 72)
+    say("The same rules against every usable cut-off")
+    say("=" * 72)
+    say("")
+    say("A cut-off is usable where every isolate's position relative to it is")
+    say("determinate, which is at the concentrations both plate designs tested.")
+    say("The ECOFF row of each table reproduces the figures above.")
+
+    sweeps = []
+    for drug in cohort.DRUGS:
+        thresholds = shared_thresholds(series, drug)
+        say(f"\n{drug}: {len(thresholds)} usable cut-offs, "
+            f"{thresholds[0]:g} to {thresholds[-1]:g} mg/L")
+        sweeps.extend(sweep(frame, flags, drug, thresholds))
+    sweep_table = pd.DataFrame(sweeps)
+
+    for drug in cohort.DRUGS:
+        for rule in RULES:
+            block = sweep_table[sweep_table.drug.eq(drug) & sweep_table.rule.eq(rule)]
+            say(f"\n  {drug}, {rule}")
+            say(f"    {'mg/L':>7s} {'above':>7s} {'sens':>18s} {'spec':>18s} "
+                f"{'PPV':>18s}")
+            for row in block.itertuples():
+                cells = []
+                for key in ("sensitivity", "specificity", "ppv"):
+                    value = getattr(row, key)
+                    low = getattr(row, f"{key}_low")
+                    high = getattr(row, f"{key}_high")
+                    cells.append(
+                        f"{100 * value:5.1f} ({100 * low:4.1f} to {100 * high:4.1f})"
+                        if value is not None and low is not None else "n/a")
+                marker = " <- ECOFF" if row.is_ecoff else ""
+                say(f"    {row.threshold_mg_L:7g} {row.above_threshold:7d} "
+                    + " ".join(f"{cell:>18s}" for cell in cells) + marker)
+
+    say("")
+    say("Sensitivity rises and the positive predictive value falls as the cut-off")
+    say("drops, because a lower cut-off counts more isolates as resistant and the")
+    say("rules call a fixed set. Where a rule's specificity stays high across the")
+    say("range, what it calls is not following the cut-off at all.")
+
     TABLE.parent.mkdir(parents=True, exist_ok=True)
     table.to_csv(TABLE, index=False)
+    sweep_table.to_csv(THRESHOLDS, index=False)
     REPORT.write_text("\n".join(_lines) + "\n")
     print(f"\nTable written to {TABLE}")
+    print(f"Cut-off sweep written to {THRESHOLDS} ({len(sweep_table)} rows)")
     print(f"Report written to {REPORT}")
 
 

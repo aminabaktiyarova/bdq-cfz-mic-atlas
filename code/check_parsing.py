@@ -29,7 +29,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from garc import parse_frame  # noqa: E402
+from cohort import ranked_counts  # noqa: E402
+from garc import GENE_CODES, gene_codes_protein, parse_frame  # noqa: E402
 
 DATA = Path("data/cryptic-v3.4.0")
 MUTATIONS = DATA / "MUTATIONS.parquet"
@@ -83,6 +84,7 @@ def main():
     say(f"\nRows for the six target genes: {len(df):,}")
     say(f"Distinct mutation strings:     {df.MUTATION.nunique():,}")
 
+    df[GENE_CODES] = gene_codes_protein(df)
     df = parse_frame(df)
 
     # ------------------------------------------------------- 1. parse coverage
@@ -232,7 +234,7 @@ def main():
         say(f"     INDEL_NUCLEOTIDES populated: {int(unresolved.INDEL_NUCLEOTIDES.notna().sum()):,}")
         if unresolved.INDEL_LENGTH.notna().any():
             say("\n   INDEL_LENGTH values where present:")
-            say(unresolved.INDEL_LENGTH.value_counts().head(10).to_string())
+            say(ranked_counts(unresolved.INDEL_LENGTH, 10).to_string())
         say("\n   FRS where present:")
         say(f"     populated: {int(unresolved.FRS.notna().sum()):,} of {len(unresolved):,}")
         if unresolved.FRS.notna().any():

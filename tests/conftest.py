@@ -72,6 +72,32 @@ def report_mic(true_log2, ladder):
     return f">{ladder[-1]}"
 
 
+# The concentration the ECOFF sits at for bedaquiline and clofazimine on both
+# real plate designs. An isolate is resistant when its MIC exceeds it.
+ECOFF = 0.25
+
+
+def binary_phenotype(mic):
+    """The resistant or susceptible call CRyPTIC derive from a reported MIC.
+
+    Derived from the reported value, not from the latent one, because that is
+    what the real table holds: BINARY_PHENOTYPE there agrees with the reported
+    interval lying above the ECOFF on every isolate of the cohort. A fixture
+    that labelled from the latent value would carry a label the MICs do not
+    determine, and a rule evaluated against it could not be checked.
+    """
+    text = str(mic)
+    if text.startswith("<="):
+        # Growth inhibited at the lowest tested concentration, which on every
+        # ladder here sits below the ECOFF.
+        return "S"
+    if text.startswith(">"):
+        return "R" if float(text[1:]) >= ECOFF else "S"
+    # A reported value is the interval below it, so it is above the ECOFF only
+    # when the value itself is. The 5% allows for rounded concentration labels.
+    return "R" if float(text) > ECOFF * 1.05 else "S"
+
+
 @pytest.fixture(scope="session")
 def dataset(tmp_path_factory):
     """Build the synthetic dataset once and return the directory holding it."""
@@ -162,7 +188,7 @@ def dataset(tmp_path_factory):
                 "TMAS_DILUTION": None, "PHENOTYPE_DESCRIPTION": "VZ,TM AGREE",
                 "BASHTHEBUG_NUMBER_CLASSIFICATIONS": None,
                 "MIC": mic, "LOG2MIC": float(np.log2(numeric)),
-                "BINARY_PHENOTYPE": "R" if true_log2 > -1.0 else "S",
+                "BINARY_PHENOTYPE": binary_phenotype(mic),
             })
 
     pd.DataFrame(mutations).set_index(["UNIQUEID", "GENE", "MUTATION"]).to_parquet(

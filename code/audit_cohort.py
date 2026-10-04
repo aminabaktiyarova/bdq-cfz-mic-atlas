@@ -46,6 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import cohort  # noqa: E402
+from mic_model import parse_concentration  # noqa: E402
 from cluster_adjust import add_clusters  # noqa: E402
 
 REPORT = Path("outputs/audit_report.txt")
@@ -88,9 +89,99 @@ def fisher(a, n1, b, n2):
     return fisher_exact([[a, n1 - a], [b, n2 - b]])
 
 
+def pooled_odds_ratio(tables):
+    """Mantel-Haenszel odds ratio over 2x2 tables, with its interval.
+
+    Returns None where fewer than two strata carry information, because a pooled
+    estimate over one stratum is that stratum.
+    """
+    import numpy as np
+    from statsmodels.stats.contingency_tables import StratifiedTable
+
+    usable = [np.array(table) for table in tables
+              if table[0][0] + table[1][0] > 0 and min(sum(row) for row in table) > 0]
+    if len(usable) < 2:
+        return None
+    pooled = StratifiedTable(usable)
+    low, high = pooled.oddsratio_pooled_confint()
+    return {"odds_ratio": float(pooled.oddsratio_pooled), "low": float(low),
+            "high": float(high), "strata": len(usable)}
+
+
+SCOPE_DRUGS = ("BDQ", "CFZ", "DLM", "LZD")
+
+
+def censoring_profile(phenotypes, drug, keep=None):
+    """How much of a drug's MIC range the plates can measure.
+
+    A left-censored reading says the MIC is below the lowest tested well and a
+    right-censored one that it is above the highest, so a drug read mostly at one
+    end of its ladder carries little quantitative information. `keep` restricts
+    the count to a set of samples.
+    """
+    rows = phenotypes[phenotypes.DRUG.eq(drug) & phenotypes.MIC.notna()]
+    if keep is not None:
+        rows = rows[rows.UNIQUEID.isin(keep)]
+    if not len(rows):
+        return None
+    text = rows.MIC.astype(str)
+    left, right = text.str.startswith("<="), text.str.startswith(">")
+    resistant = rows.BINARY_PHENOTYPE.eq("R")
+    return {
+        "drug": drug, "MICs": len(rows),
+        "left-censored %": round(100 * left.mean(), 1),
+        "right-censored %": round(100 * right.mean(), 1),
+        "resistant": int(resistant.sum()),
+        "resistant at the ceiling %": (round(100 * right[resistant].mean(), 1)
+                                       if int(resistant.sum()) else None),
+    }
+
+
+def resistant_wells(layout, drug):
+    """Per plate design, the tested concentrations a resistant MIC can land on.
+
+    PLATE_LAYOUT labels every well S or R, so the wells labelled R are the
+    measurable range above the breakpoint. A drug with one such well can only
+    report resistance as a single value or as off-scale.
+    """
+    rows = layout[layout.DRUG.eq(drug)]
+    counts = {}
+    for design, chunk in rows.groupby("PLATEDESIGN", observed=True):
+        wells = {}
+        for concentration, label in zip(chunk.CONC, chunk.BINARY_PHENOTYPE):
+            value, operator = parse_concentration(concentration)
+            if value is None or value <= 0:
+                continue
+            # A ">x" row is the bin above the highest well and repeats that
+            # well's concentration, so the concentration counts towards the
+            # ladder while the label belongs to the bin and not to the well.
+            if operator in (">", ">=") and value in wells:
+                continue
+            wells[value] = label
+        resistant = sorted(value for value, label in wells.items() if label == "R")
+        susceptible = sorted(value for value, label in wells.items() if label == "S")
+        counts[design] = {
+            "wells": len(wells),
+            "resistant wells": len(resistant),
+            "highest susceptible": susceptible[-1] if susceptible else None,
+        }
+    return counts
+
+
+def mic_is_missing(df, drug):
+    """Which rows record a plate design, and which of those record no MIC.
+
+    A sample with no row for the drug at all is not a missing measurement of it,
+    so the denominator is the rows that carry a design.
+    """
+    recorded = df[f"PLATEDESIGN_{drug}"].notna()
+    return recorded, recorded & df[f"MIC_{drug}"].isna()
+
+
 def main():
     import numpy as np
     import pandas as pd
+    from scipy.stats import chi2_contingency
 
     say("=" * 72)
     say("Cohort audit")
@@ -307,6 +398,98 @@ def main():
 
     say("\n  Whether a held-out test is possible depends on the exposed groups having")
     say("  enough samples in the smaller half. The crosstab above is the answer.")
+
+    # ------------------------------------------- 5. rows that carry no MIC
+    say("\n" + "=" * 72)
+    say("5. Rows carrying no MIC, and whether the loss is random")
+    say("=" * 72)
+
+    worst_site = None
+    for drug in cohort.DRUGS:
+        recorded, missing = mic_is_missing(df, drug)
+        say(f"\n  {drug}: {int(recorded.sum()):,} rows carry a plate design, "
+            f"{int(missing.sum())} of them no MIC. "
+            f"{int((~recorded).sum())} samples carry no {drug} row at all.")
+
+        with_mic = df[df[f"MIC_{drug}"].notna()]
+        left = int(with_mic[f"censored_left_{drug}"].sum())
+        right = int(with_mic[f"censored_right_{drug}"].sum())
+        say(f"    of the {len(with_mic):,} rows carrying a MIC, {left:,} are "
+            f"left-censored, {100 * left / len(with_mic):.2f}%, and {right} are "
+            f"right-censored")
+
+        by_site = pd.DataFrame({
+            "rows": recorded.groupby(df.SITEID).sum(),
+            "missing": missing.groupby(df.SITEID).sum(),
+        })
+        by_site["percent"] = (100 * by_site.missing / by_site.rows).round(2)
+        say("")
+        say(by_site.sort_values("percent", ascending=False).head(4).to_string())
+        worst_site = by_site.percent.idxmax() if worst_site is None else worst_site
+        here = df.SITEID.eq(worst_site)
+        a, n1 = int(missing[here].sum()), int(recorded[here].sum())
+        b, n2 = int(missing[~here].sum()), int(recorded[~here].sum())
+        odds, p = fisher(a, n1, b, n2)
+        say(f"    site {worst_site}: {a} of {n1:,}, {100 * a / n1:.2f}%, against "
+            f"{b} of {n2:,} elsewhere, {100 * b / n2:.2f}%, odds ratio {odds:.1f}, "
+            f"p = {p:.2g}")
+
+        say("\n    By plate design:")
+        tables = []
+        for design, chunk in df[recorded].groupby(df[f"PLATEDESIGN_{drug}"][recorded],
+                                                  observed=True):
+            lost = int(missing[chunk.index].sum())
+            say(f"      {design}: {lost} of {len(chunk):,}, "
+                f"{100 * lost / len(chunk):.2f}%")
+        for site, chunk in df[recorded].groupby(df.SITEID[recorded], observed=True):
+            designs = chunk[f"PLATEDESIGN_{drug}"].unique()
+            if not {"UKMYC5", "UKMYC6"} <= set(designs):
+                continue
+            counts = []
+            for design in ("UKMYC5", "UKMYC6"):
+                part = chunk[chunk[f"PLATEDESIGN_{drug}"].eq(design)]
+                lost = int(missing[part.index].sum())
+                counts.append([lost, len(part) - lost])
+            tables.append(counts)
+        pooled = pooled_odds_ratio(tables)
+        if pooled:
+            say(f"      UKMYC5 against UKMYC6, SITEID held constant across "
+                f"{pooled['strata']} sites that ran both: "
+                f"{pooled['odds_ratio']:.2f} ({pooled['low']:.2f} to "
+                f"{pooled['high']:.2f})")
+
+        say("\n    By genotype status:")
+        status = pd.Series("carrier", index=df.index)
+        status[df.GROUP.eq("reference")] = "reference"
+        status[df.GROUP.eq("uncertain")] = "uncertain"
+        for label, excluded in (("all sites", df.SITEID.ne(df.SITEID)),
+                                (f"without site {worst_site}", here)):
+            keep = recorded & ~excluded
+            table = []
+            for name in ("uncertain", "reference", "carrier"):
+                part = keep & status.eq(name)
+                lost = int(missing[part].sum())
+                table.append([lost, int(part.sum()) - lost])
+                say(f"      {label}, {name}: {lost} of {int(part.sum()):,}, "
+                    f"{100 * lost / max(int(part.sum()), 1):.2f}%")
+            statistic, p, _, _ = chi2_contingency(np.array(table))
+            say(f"      {label}: chi-square {statistic:.1f}, p = {p:.3g}")
+
+    # ------------------------------------------------ 6. why these two drugs
+    say("\n" + "=" * 72)
+    say("6. What the plates can measure, for the four drugs in this axis")
+    say("=" * 72)
+    say("")
+    rows = [censoring_profile(phenotypes, drug, keep=set(df.index))
+            for drug in SCOPE_DRUGS]
+    say(pd.DataFrame([row for row in rows if row]).to_string(index=False))
+    say("")
+    layout = pd.read_parquet(cohort.DATA / "PLATE_LAYOUT.parquet").reset_index()
+    for drug in SCOPE_DRUGS:
+        for design, counts in resistant_wells(layout, drug).items():
+            say(f"  {drug} {design}: {counts['wells']} tested concentrations, "
+                f"{counts['resistant wells']} of them above the breakpoint, "
+                f"highest susceptible well {counts['highest susceptible']}")
 
     write_report()
     say(f"\nWritten to {REPORT}")
