@@ -142,9 +142,10 @@ Outputs are regenerated from the CRyPTIC release and are not tracked.
 pytest
 ```
 
-The suite is 214 tests against a synthetic dataset built to the CRyPTIC schema
+The suite is 273 tests against a synthetic dataset built to the CRyPTIC schema
 with known ground truth planted in it, so it needs no downloaded data and
-finishes in under a minute.
+finishes in about a minute. One of the tests reads that count back from
+pytest's own collector, so the figure above cannot drift from the suite.
 
 It checks the things the results depend on rather than the things that are easy
 to check. That a null call and a het call are not variants and not wild type.
@@ -163,6 +164,13 @@ the one taken as the second report. That the coding flag is read over the gene
 rather than off the row, since the column is false on every promoter mutation.
 That each interval and each resampled estimate is seeded by the quantity it
 belongs to, so a figure can be reproduced without rerunning what preceded it.
+That the catalogue benchmark can write its per-variant table only inside
+`quarantine/` and its metrics only inside `outputs/`, and that the guard fires
+when a graded variant reaches the released report. That the multiplicity
+correction is monotone and that a gene with no resistant carrier in any stratum
+returns an absent estimate rather than a pooled zero. That every HGVS name
+translates back to the GARC string it came from, over all 441 ordered residue
+pairs in the genetic code.
 
 Each test was verified by breaking the code it covers and confirming the test
 fails.

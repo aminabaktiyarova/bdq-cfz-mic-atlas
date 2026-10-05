@@ -10,6 +10,8 @@ this passes on a machine that has never downloaded the CRyPTIC data.
 
 import csv
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -113,6 +115,33 @@ def test_every_kind_of_estimate_is_named_in_the_dictionary():
     assert written
     assert written <= documented_values("heteroresistance_estimates.csv",
                                         "estimate")
+
+
+def collected_test_count():
+    """
+    The number of tests pytest collects, read from pytest's own collector
+    rather than counted by hand. Collection imports the test modules and runs
+    no test body, so this does not recurse.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q",
+         "-p", "no:cacheprovider", str(ROOT / "tests")],
+        capture_output=True, text=True, cwd=ROOT, check=False)
+    assert result.returncode == 0, result.stderr or result.stdout
+    per_file = re.findall(r"^tests/\S+\.py: (\d+)$", result.stdout, re.M)
+    assert per_file, result.stdout
+    return sum(int(count) for count in per_file)
+
+
+def test_the_readme_states_the_current_test_count():
+    """
+    A suite size written into prose drifts as tests are added, and a reader has
+    no way to tell. The count is compared against the collector.
+    """
+    readme = (ROOT / "README.md").read_text()
+    stated = re.search(r"The suite is ([\d,]+) tests", readme)
+    assert stated, "the README does not state a test count"
+    assert int(stated.group(1).replace(",", "")) == collected_test_count()
 
 
 def test_the_readme_names_every_document():
