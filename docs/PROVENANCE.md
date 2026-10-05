@@ -65,27 +65,38 @@ Computed from UKMYC_PHENOTYPES: 21,685 samples across 288,904 rows. Per-drug cou
 | VARIANTS.parquet | 1.3 GB |
 | WGS_SAMPLES.parquet | 9.4 MB |
 
-MD5 checksums for every file are published on the Zenodo record. The copies this analysis
-reads were verified against them: all nine match, including MUTATIONS.parquet at
-1,062,006,199 bytes. No file differs from its published checksum at full size.
+MD5 checksums for every file are published on the Zenodo record. Fourteen of the nineteen
+are held in `data/` and every one matches its published checksum at full size, including
+MUTATIONS.parquet at 1,062,006,199 bytes.
 
 | File | Bytes | MD5 |
 | --- | --- | --- |
+| COUNTRIES_LOOKUP.csv.gz | 4,572 | `693cbffe95d305499779e09d7bb903e6` |
 | DATA_SCHEMA.pdf | 102,717 | `8b11bfbb9255da6dfc1b8b7aede767d0` |
 | DRUG_CODES.csv.gz | 385 | `923d3a193df21698bd6a00f857ab337e` |
+| DST_MEASUREMENTS.parquet | 2,723,899 | `45b4501ea7c3925af565dbbc6188dec0` |
+| DST_SAMPLES.parquet | 820,473 | `afa5d4d67e0e9ea9e4f325f06d815e9a` |
 | GENOMES.parquet | 2,604,147 | `ebd82e85f71e36de5da10e776b6afe4e` |
 | MUTATIONS.parquet | 1,062,006,199 | `d5feeeae14304006ba67aaaef84cff03` |
 | PLATE_LAYOUT.parquet | 5,916 | `cb403c7517ec847467b7980cbc3e5389` |
 | RELEASE_NOTES.md | 18,798 | `dfac1d2007ad30bb749f7bb3bcb9645b` |
 | SITES.csv.gz | 1,325 | `c24c882c8988b5af9940232ada27fb60` |
+| UKMYC_GROWTH.parquet | 15,076,046 | `403ba6d904a3846b8d2535be2de4785a` |
 | UKMYC_PHENOTYPES.parquet | 1,559,813 | `020b6c0af6c05e19610a59f5ef97b832` |
+| UKMYC_PLATES.parquet | 2,388,028 | `7b2880f45079c74e88aa4d12c1c18167` |
 | WGS_SAMPLES.parquet | 9,410,557 | `ea798f4cfc28525cf394ff9196c93021` |
 
-Four further files downloaded as 92-byte stubs rather than data: DST_MEASUREMENTS.parquet,
-DST_SAMPLES.parquet, UKMYC_GROWTH.parquet and UKMYC_PLATES.parquet. All four carry the same
-checksum as one another, which is the signature of a server response rather than of
-truncated data, and none is read by any module here. They are recorded as absent rather
-than treated as present.
+Six of the fourteen are read by a module: GENOMES, MUTATIONS, PLATE_LAYOUT, SITES,
+UKMYC_PHENOTYPES and WGS_SAMPLES. The rest are documentation, reference lookups, or tables
+consulted for the cross-checks recorded below.
+
+Two further files, EFFECTS.parquet and PREDICTIONS.parquet, are held in `quarantine/` for
+the licence reason given below and were verified the same way.
+
+Three files were not downloaded. VARIANTS.parquet is not needed, because MUTATIONS carries
+the gene and protein level calls this analysis uses. BASHTHEBUG_CLASSIFICATIONS.parquet is
+excluded for the privacy reason given below. BASHTHEBUG.parquet holds aggregated volunteer
+readings that no analysis here uses.
 
 Naming mismatch to watch: the schema calls the drug lookup table DRUG_CODE, the file on
 Zenodo is DRUG_CODES.csv.gz.
@@ -590,10 +601,17 @@ and therefore falls under the same quarantine as EFFECTS and PREDICTIONS. No fig
 repository is computed from it.
 
 The 54,057 row count does not match the 53,897 stated on the record as having both WGS and
-pDST. PLACEHOLDER: the 160-sample difference is unexplained and cannot be resolved from the
-files on disk. The record's figure counts samples with any pDST result, which lives in
-DST_MEASUREMENTS, and that file downloaded as 92 bytes and does not open as parquet.
-UKMYC_PHENOTYPES covers only the 96-well plate subset and cannot stand in for it.
+pDST. Resolved against DST_SAMPLES.parquet, which carries 65,842 rows, one per sample.
+53,897 of them are also in GENOMES and 11,945 are not, which reproduces both figures on the
+record exactly, so the record counts rows of that table. The remaining 160 GENOMES samples
+have a genome and no DST_SAMPLES row. None of the 160 carries a UKMYC MIC, so the join
+described in the next section is unaffected.
+
+A separate inconsistency inside the shipped data was found while checking that: 26 of the
+65,842 DST_SAMPLES rows declare NUMBER_DST 13 and have no row at all in
+DST_MEASUREMENTS, 2 of them in GENOMES. Counting distinct identifiers in
+DST_MEASUREMENTS instead therefore gives 53,895 and 11,921, neither of which is the figure
+on the record. No figure in this repository reads either table.
 
 ## The join: 6,525 MIC samples have no genome
 
