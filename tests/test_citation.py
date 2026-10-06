@@ -1,12 +1,12 @@
 """
 Tests holding the citation metadata to the repository.
 
-CITATION.cff, for the software, and docs/ATLAS_CITATION.cff, for the atlas
-table, are what a reader copies into a reference list, so their author, ORCID,
-affiliation, license, repository and the dataset they cite must say what the
-rest of the repository says. The repository pins no YAML parser, so the file's key
-lines are read directly; the file was validated against the CFF 1.2.0 schema
-separately.
+CITATION.cff, for the software, and docs/DATA_CITATION.cff, for the released
+data tables, are what a reader copies into a reference list, so their author,
+ORCID, affiliation, license, repository and the dataset they cite must say what
+the rest of the repository says. The repository pins no YAML parser, so the
+file's key lines are read directly; the file was validated against the CFF
+1.2.0 schema separately.
 """
 
 import pathlib
@@ -16,8 +16,14 @@ import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CFF = ROOT / "CITATION.cff"
-ATLAS = ROOT / "docs" / "ATLAS_CITATION.cff"
+DATA = ROOT / "docs" / "DATA_CITATION.cff"
 ORCID = "0009-0007-6265-6493"
+VERSION_DOI = "10.5281/zenodo.23194535"
+CONCEPT_DOI = "10.5281/zenodo.23194534"
+NUMBER_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven",
+                "eight", "nine", "ten", "eleven", "twelve", "thirteen",
+                "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+                "nineteen", "twenty")
 
 
 def values(key, text=None):
@@ -92,7 +98,7 @@ def test_the_entry_claims_no_release():
     assert values("date-released") == []
 
 
-# The atlas table
+# The released data tables
 
 
 def atlas_section(path):
@@ -100,60 +106,97 @@ def atlas_section(path):
     return text.split("## outputs/atlas_evidence.csv")[1].split("\n---")[0]
 
 
-def test_the_atlas_entry_declares_cff_1_2_0_as_a_dataset():
-    text = ATLAS.read_text()
+def data_head():
+    """Everything the entry says about the tables, before its references."""
+    return DATA.read_text().split("\nreferences:\n")[0]
+
+
+def data_abstract():
+    return " ".join(DATA.read_text().split("\nabstract: >-\n")[1]
+                    .split("\ntype:")[0].split())
+
+
+def defined_tables():
+    """Every table docs/DATA_DICTIONARY.md gives a column list for."""
+    dictionary = (ROOT / "docs" / "DATA_DICTIONARY.md").read_text()
+    return re.findall(r"^## outputs/(\S+\.csv)$", dictionary, re.M)
+
+
+def citing_section():
+    section = (ROOT / "README.md").read_text().split("\n## Citing\n")[1]
+    return " ".join(section.split("\n## ")[0].split())
+
+
+def test_the_data_entry_declares_cff_1_2_0_as_a_dataset():
+    text = DATA.read_text()
     assert values("cff-version", text) == ["1.2.0"]
     for key in ("message", "title", "authors"):
         assert re.search(rf"^{key}:", text, re.M), key
-    assert values("type", text.split("\nreferences:\n")[0]) == ["dataset"]
+    assert re.search(r"^type: dataset$", data_head(), re.M)
 
 
-def test_the_atlas_entry_carries_the_same_author_identity():
-    assert first_author(ATLAS) == first_author(CFF)
-    assert set(values("affiliation", ATLAS.read_text())) == {"Independent Researcher"}
+def test_the_data_entry_carries_the_same_author_identity():
+    assert first_author(DATA) == first_author(CFF)
+    affiliations = set(values("affiliation", DATA.read_text()))
+    assert affiliations == {"Independent Researcher"}
 
 
-def test_the_atlas_entry_is_licensed_as_the_derived_data_are():
-    assert values("license", ATLAS.read_text().split("\nreferences:\n")[0]) == [
-        "CC-BY-4.0"]
+def test_the_data_entry_is_licensed_as_the_derived_data_are():
+    assert values("license", data_head()) == ["CC-BY-4.0"]
     assert "derived data under CC BY 4.0" in (ROOT / "README.md").read_text()
     licenses = " ".join((ROOT / "LICENSES.md").read_text().split())
     assert "Derived data tables released by this project are licensed under" in licenses
     assert "Attribution 4.0 International (CC BY 4.0)" in licenses
 
 
-def test_the_atlas_entry_names_a_table_the_pipeline_writes_and_documents():
-    title = values("title", ATLAS.read_text())[0]
-    assert "(outputs/atlas_evidence.csv)" in title
-    readme = (ROOT / "README.md").read_text()
-    assert "| `atlas_evidence.csv` | `code/build_atlas.py` |" in readme
-    assert "Written by `code/build_atlas.py`. One row per distinct mutation." in (
-        atlas_section(ROOT / "docs" / "DATA_DICTIONARY.md"))
+def test_the_data_entry_titles_the_drugs_the_genes_and_the_source_release():
+    import cohort
+
+    title = values("title", DATA.read_text())[0]
+    for token in ("Bedaquiline", "clofazimine", "Mycobacterium tuberculosis",
+                  *cohort.BDQ_GENES, "v3.4.0"):
+        assert token in title, token
 
 
-def test_the_atlas_abstract_says_what_the_code_and_dictionary_say():
+def test_the_data_entry_counts_the_tables_the_dictionary_defines():
     """
-    The genes named are the ones the cohort definition reads, the row is the
-    dictionary's, and the prevalence caveat the dictionary carries is kept.
+    One table is deposited for every column list in the dictionary, so the
+    count the abstract opens with is read back from the dictionary, and every
+    table it counts is one the README records a writer for.
+    """
+    tables = defined_tables()
+    assert data_abstract().split()[0].lower() == NUMBER_WORDS[len(tables)]
+    readme = (ROOT / "README.md").read_text()
+    for table in tables:
+        assert f"`{table}`" in readme, table
+
+
+def test_the_data_abstract_says_what_the_code_and_dictionary_say():
+    """
+    The genes named in the per-variant row are the ones the cohort definition
+    reads, the row is the dictionary's, and the prevalence caveat the
+    dictionary carries is kept.
     """
     import cohort
 
-    abstract = " ".join(ATLAS.read_text().split("\nabstract: >-\n")[1]
-                        .split("\ntype:")[0].split())
-    genes = cohort.BDQ_GENES
-    assert f"One row per distinct mutation in {genes[0]}, {genes[1]} and {genes[2]}" \
-        in abstract
-    assert cohort.MODIFIER_GENE not in abstract
+    abstract = data_abstract()
+    first, second, third = cohort.BDQ_GENES
+    phrase = f"row per distinct mutation in {first}, {second} and {third}"
+    assert phrase in abstract
+    sentence = phrase + abstract.split(phrase)[1].split(". ")[0]
+    assert cohort.MODIFIER_GENE.lower() not in sentence.lower()
     dictionary = " ".join(atlas_section(ROOT / "docs" / "DATA_DICTIONARY.md").split())
+    assert ("Written by `code/build_atlas.py`. One row per distinct mutation."
+            in dictionary)
     caveat = ("Resistance in this collection is concentrated at one site by design, "
               "so no count in this table is a prevalence estimate.")
     assert caveat in dictionary
-    assert caveat.replace("this table", "the table") in abstract
+    assert caveat.replace("this table", "these tables") in abstract
     assert "docs/DATA_DICTIONARY.md defines every column." in abstract
 
 
-def test_the_atlas_entry_cites_the_source_release_and_the_software():
-    references = ATLAS.read_text().split("\nreferences:\n")[1]
+def test_the_data_entry_cites_the_source_release_and_the_software():
+    references = DATA.read_text().split("\nreferences:\n")[1]
     software, source = CFF.read_text().split("\nreferences:\n")
     data, cited = references.split("\n  - type: software\n")
     assert values("type", data)[0] == "data"
@@ -162,22 +205,32 @@ def test_the_atlas_entry_cites_the_source_release_and_the_software():
     assert values("title", cited) == values("title", software)
     assert values("repository-code", cited) == values("repository-code", software)
     assert values("license", cited) == values("license", software)
-    assert first_author(ATLAS) == {key: values(key, cited)[0] for key in (
+    assert first_author(DATA) == {key: values(key, cited)[0] for key in (
         "family-names", "given-names", "orcid", "affiliation")}
 
 
-def test_the_atlas_entry_claims_no_deposit():
-    """No identifier, version or release date exists until the table is deposited."""
-    entry = ATLAS.read_text().split("\nreferences:\n")[0]
-    for key in ("doi", "identifiers", "version", "date-released"):
-        assert values(key, entry) == [], key
+def test_the_data_entry_cites_the_deposit():
+    """
+    The entry carries the version DOI of the deposit, the version and release
+    date it was published under, and the concept DOI that resolves to the
+    latest version. The README carries both DOIs under the same two names.
+    """
+    head = data_head()
+    identifiers = head.split("\nidentifiers:\n")[1].split("\nauthors:\n")[0]
+    assert values("doi", head) == [VERSION_DOI]
+    assert values("version", head) == ["1.0.0"]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", values("date-released", head)[0])
+    assert values("type", identifiers) == ["doi"]
+    assert values("value", identifiers) == [CONCEPT_DOI]
+    section = citing_section()
+    assert f"version DOI {VERSION_DOI}" in section
+    assert f"concept DOI {CONCEPT_DOI}" in section
 
 
-def test_the_readme_and_the_software_entry_point_at_the_atlas_entry():
-    assert "docs/ATLAS_CITATION.cff" in values("message")[0]
-    section = (ROOT / "README.md").read_text().split("\n## Citing\n")[1]
-    section = " ".join(section.split("\n## ")[0].split())
-    assert "`CITATION.cff`" in section and "`docs/ATLAS_CITATION.cff`" in section
-    assert "`outputs/atlas_evidence.csv`" in section
+def test_the_readme_and_the_software_entry_point_at_the_data_entry():
+    assert "docs/DATA_CITATION.cff" in values("message")[0]
+    section = citing_section()
+    assert "`CITATION.cff`" in section
+    assert "`docs/DATA_CITATION.cff`" in section
     reference = CFF.read_text().split("\nreferences:\n")[1]
-    assert (f"v3.4.0, version DOI {values('doi', reference)[0]}" in section)
+    assert f"v3.4.0, version DOI {values('doi', reference)[0]}" in section

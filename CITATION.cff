@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 # The repository has made no release, so this entry carries no version and no
 # release date. Both are set when a release is made.
-message: "If you use this software, cite it as below. Cite the atlas table with docs/ATLAS_CITATION.cff."
+message: "If you use this software, cite it as below. Cite the released data tables with docs/DATA_CITATION.cff."
 title: "bdq-cfz-mic-atlas: a quantitative atlas of Rv0678 and MmpL5 mutation effects on bedaquiline and clofazimine MICs"
 abstract: >-
   An open, versioned resource quantifying how mutations in the Rv0678 and MmpL5

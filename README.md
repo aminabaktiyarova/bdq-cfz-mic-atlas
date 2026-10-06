@@ -192,7 +192,7 @@ Outputs are regenerated from the CRyPTIC release and are not tracked.
 pytest
 ```
 
-The suite is 491 tests against synthetic data with known ground truth planted
+The suite is 492 tests against synthetic data with known ground truth planted
 in it: a dataset built to the CRyPTIC schema for the pipeline, and reports
 simulated onto a plate's dilution series for the micecoff package. It needs no
 downloaded data and finishes in about two minutes. One of the tests reads that
@@ -230,10 +230,11 @@ fails.
 
 ## Citing
 
-Cite the software with `CITATION.cff` and the atlas table,
-`outputs/atlas_evidence.csv`, with `docs/ATLAS_CITATION.cff`. The table has no
-persistent identifier until it is deposited, so a citation of it names the
-commit of this repository that produced the copy used. Both entries cite the
+Cite the software with `CITATION.cff` and the released data tables with
+`docs/DATA_CITATION.cff`. The tables are deposited at Zenodo under
+version DOI 10.5281/zenodo.23194535, and the concept DOI
+10.5281/zenodo.23194534 resolves to the latest version. A copy regenerated from
+this repository is cited by the commit that produced it. Both entries cite the
 CRyPTIC Consortium Dataset v3.4.0, version DOI 10.5281/zenodo.15680920, from
 which every table derives.
 
