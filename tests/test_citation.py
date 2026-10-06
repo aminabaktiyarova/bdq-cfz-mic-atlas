@@ -46,6 +46,11 @@ def citing_section():
     return " ".join(section.split("\n## ")[0].split())
 
 
+def status_section():
+    section = (ROOT / "README.md").read_text().split("\n## Status\n")[1]
+    return " ".join(section.split("\n## ")[0].split())
+
+
 def test_the_file_declares_cff_1_2_0_and_its_required_keys():
     text = CFF.read_text()
     assert values("cff-version") == ["1.2.0"]
@@ -250,3 +255,21 @@ def test_the_readme_and_the_software_entry_point_at_the_data_entry():
     assert "`docs/DATA_CITATION.cff`" in section
     reference = CFF.read_text().split("\nreferences:\n")[1]
     assert f"v3.4.0, version DOI {values('doi', reference)[0]}" in section
+
+
+def test_the_status_section_states_the_release_the_entries_cite():
+    """
+    The Status section is what a reader reaches last, so it names the version
+    the software entry carries and both version DOIs, and it carries no
+    sentence denying that a release or a deposit exists.
+    """
+    import micecoff
+
+    status = status_section()
+    assert f"`v{micecoff.__version__}`" in status
+    assert SOFTWARE_DOI in status
+    assert DATA_DOI in status
+    for denial in ("no versioned release", "no citable identifier",
+                   "has not been released", "has not been deposited",
+                   "no release has been made", "not yet"):
+        assert denial not in status.lower(), denial

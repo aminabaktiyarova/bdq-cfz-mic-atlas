@@ -29,7 +29,8 @@ A large deletion is written twice in the source table, once as the fraction of
 the gene absent and once as the sequence removed, and the two rows are one
 event. The fraction row is the variant here and the sequence row is dropped, so
 a sample whose only finding is such a deletion counts as a solo isolate.
-`docs/PROVENANCE.md`, schema question 9, has the counts.
+`docs/PROVENANCE.md` gives the counts under "Schema: the mutation table's own
+conventions".
 
 The class of a variant is decided in the order the column lists: a gene deletion
 first, then a frameshift, then a stop codon, then a change confined to the
@@ -217,6 +218,11 @@ the cohort definitions exclude as uncertain, stacked with a column naming which.
 The read fraction is FRS, the fraction of reads supporting the minor allele, and
 runs from 0.077 to 0.890 in this cohort. Every estimate in this table is
 exploratory.
+
+The point estimates, counts and withholding reasons have been equal on each
+machine this table has been regenerated on. The interval bounds move in the
+third decimal: a regeneration on a different CPU architecture moved five of this
+table's 588 cells, every one an interval bound, by 0.001 to 0.006 doublings.
 
 A `shift` row fits each group against a reference group fitted on its own, so
 each carries its own standard deviation. A `joint shift` row fits every group

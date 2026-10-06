@@ -1,5 +1,5 @@
 """
-Verifies that the Trajectory B analysis environment is correctly installed and
+Verifies that the analysis environment is correctly installed and
 that the local copy of the CRyPTIC v3.4.0 tables reproduces known figures.
 
 Run from the project root with the virtual environment active:

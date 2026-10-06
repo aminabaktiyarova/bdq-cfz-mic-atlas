@@ -1,4 +1,4 @@
-# Trajectory B analysis environment
+# Analysis environment for bdq-cfz-mic-atlas
 # Python 3.14.7
 # Every version below was checked against PyPI for a CPython 3.14 macOS wheel.
 # Versions are pinned exactly so the environment is reproducible from this file alone.

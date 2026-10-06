@@ -656,7 +656,11 @@ than one minor allele at Rv0678, and one resolved form does not parse.
 Shifts in doublings against the reference group, to one decimal. The major rows
 use the same cohort, the same filters, the same estimator and the same resampling
 as the minor rows, so the four are comparable. `outputs/heteroresistance_estimates.csv`
-carries three decimals and the plain fits beside these.
+carries three decimals and the plain fits beside these. Its third decimal is
+specific to the machine that wrote it: a regeneration on a different CPU
+architecture moved five of that table's 588 cells, every one an interval bound,
+by 0.001 to 0.006 doublings, and left every point estimate, count and
+withholding reason equal. The figures below are unmoved at one decimal.
 
 | Group | Isolates | Clusters | BDQ shift | 95% | CFZ shift | 95% |
 | --- | --- | --- | --- | --- | --- | --- |

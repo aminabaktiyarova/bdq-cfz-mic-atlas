@@ -192,7 +192,7 @@ Outputs are regenerated from the CRyPTIC release and are not tracked.
 pytest
 ```
 
-The suite is 492 tests against synthetic data with known ground truth planted
+The suite is 493 tests against synthetic data with known ground truth planted
 in it: a dataset built to the CRyPTIC schema for the pipeline, and reports
 simulated onto a plate's dilution series for the micecoff package. It needs no
 downloaded data and finishes in about two minutes. One of the tests reads that
@@ -252,6 +252,8 @@ ORCID 0009-0007-6265-6493
 
 ## Status
 
-No versioned release has been made. The pipeline, the derived tables and
-`docs/RESULTS.md` are current with each other; the atlas table has no citable
-identifier of its own yet.
+Released as `v0.1.0` and archived at Zenodo under version DOI
+10.5281/zenodo.23196270. The released tables are deposited under version DOI
+10.5281/zenodo.23194535, and the deposit records the commit they were
+regenerated from. The pipeline, the derived tables and `docs/RESULTS.md` are
+current with each other.
