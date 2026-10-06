@@ -9,6 +9,7 @@ a table not yet written is skipped, so the suite collects the same tests and
 passes in a fresh clone that has never downloaded the CRyPTIC data.
 """
 
+import ast
 import csv
 import re
 import subprocess
@@ -197,3 +198,103 @@ def test_the_results_document_names_no_quarantined_table():
         for paragraph in paragraphs:
             if table in paragraph:
                 assert "excluded from" in paragraph, paragraph
+
+
+def outputs_paths(tree):
+    """Names a module binds to a path under outputs/, and what each one is.
+
+    A module that reads a table another module writes has to run after it. The
+    bindings are read from the source so the README cannot drift from the code.
+    """
+    bound = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        value = node.value
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            target = value.value
+        elif (isinstance(value, ast.Call) and len(value.args) == 1
+                and isinstance(value.args[0], ast.Constant)
+                and isinstance(value.args[0].value, str)):
+            # Any single-argument call, so an aliased or qualified Path, or a
+            # bare open(), is recognised as well as the plain Path("outputs/x").
+            target = value.args[0].value
+        else:
+            continue
+        if not target.startswith("outputs/"):
+            continue
+        for name in node.targets:
+            if isinstance(name, ast.Name):
+                bound[name.id] = target
+    return bound
+
+
+def outputs_touched(path):
+    """The outputs/ paths a module reads and the ones it writes."""
+    tree = ast.parse(path.read_text())
+    bound = outputs_paths(tree)
+    reads, writes = set(), set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        attr = node.func.attr if isinstance(node.func, ast.Attribute) else ""
+        names = [a.id for a in node.args if isinstance(a, ast.Name) and a.id in bound]
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+            if node.func.value.id in bound:
+                names.append(node.func.value.id)
+        for name in names:
+            if attr.startswith("read"):
+                reads.add(bound[name])
+            elif attr.startswith("write") or attr.startswith("to_"):
+                writes.add(bound[name])
+    return reads, writes
+
+
+def declared_order():
+    """The pairs the README states, as (runs after, runs before)."""
+    readme = (ROOT / "README.md").read_text()
+    return set(re.findall(r"`code/([\w.]+)\.py` after `code/([\w.]+)\.py`", readme))
+
+
+def test_the_readme_declares_every_dependency_between_modules():
+    """
+    A module reading a table another module writes is an ordering constraint. A
+    constraint the README does not state leaves a reader running the modules in
+    an order that fails, which is how the hgvs_names dependency went unrecorded.
+    """
+    reads, writes = {}, {}
+    for path in sorted((ROOT / "code").glob("*.py")):
+        reads[path.stem], writes[path.stem] = outputs_touched(path)
+    found = {(reader, writer)
+             for reader, wanted in reads.items()
+             for writer, written in writes.items()
+             if reader != writer and wanted & written}
+    declared = declared_order()
+    assert found, "no dependency was detected, so the scan is not working"
+    assert found <= declared, f"undeclared: {sorted(found - declared)}"
+
+
+def test_the_readme_declares_no_dependency_that_does_not_exist():
+    """A stale pair in the README is as misleading as a missing one."""
+    reads, writes = {}, {}
+    for path in sorted((ROOT / "code").glob("*.py")):
+        reads[path.stem], writes[path.stem] = outputs_touched(path)
+    # validate.py depends on discovery.py through docs/PRE_REGISTRATION.md
+    # rather than through outputs/, so it is declared and not detectable here.
+    through_outputs = {(r, w) for r, wanted in reads.items()
+                       for w, written in writes.items()
+                       if r != w and wanted & written}
+    for after, before in declared_order():
+        assert after in reads and before in writes, (after, before)
+        if (after, before) not in through_outputs:
+            assert (after, before) == ("validate", "discovery"), (after, before)
+
+
+def test_the_run_list_satisfies_the_declared_order():
+    """The commands the README gives have to run in an order that works."""
+    lines = [l for l in (ROOT / "README.md").read_text().splitlines()
+             if l.startswith("python code/")]
+    order = [l.split("code/")[1].split(".py")[0] for l in lines]
+    assert len(order) > 10
+    for after, before in declared_order():
+        assert order.index(after) > order.index(before), (after, before)

@@ -1035,7 +1035,7 @@ rules, so an isolate is graded by what the catalogue would say about the
 variants it carries rather than by a join on variant names. An isolate is R if
 any variant it carries is graded R, else U if any is U, else F, else S, and an
 isolate carrying no graded variant is S. Only real major-allele variants are
-graded, which is how Section 7.8 treats its own rules, so the two are
+graded, which is how the genotype rules above are treated, so the two are
 comparable. A grade of U is not a call of resistance, so the cells below count
 R against everything else.
 

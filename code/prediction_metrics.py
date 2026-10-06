@@ -22,7 +22,7 @@ The rules, each applied per drug to the samples carrying a MIC for it:
 A rule calls an isolate resistant or not. A null call is not a detected variant,
 so a sample whose gene could not be read is called not-resistant by every rule,
 which is how a catalogue applied to a real sequence behaves. The fourth rule
-exists because Section 8.8 finds detected minor alleles associated with MIC
+exists because code/heteroresistance.py finds detected minor alleles with MIC
 shifts as large as major alleles of the same class, and the question is what
 admitting them would cost.
 

@@ -82,12 +82,27 @@ figures. It fails loudly if the local data is a different release.
 
 Each module reads the CRyPTIC tables directly and writes to `outputs/`, except
 `benchmark_catalogue.py`, which also reads a restricted-licence catalogue from
-`quarantine/` and writes its per-variant table back there. None reads another
-module's output, so they can be run in any order, with one exception: `discovery.py` writes `docs/PRE_REGISTRATION.md`, and `validate.py`
-refuses to run until that file is committed and unmodified. Once it is in git,
-`discovery.py` leaves it alone and reports its fresh estimates in its own report,
-because rewriting it would put predictions made after the result was known where
-predictions made before it used to be.
+`quarantine/` and writes its per-variant table back there. Two modules must run
+after another, and the order listed below satisfies both.
+
+- `code/hgvs_names.py` after `code/build_atlas.py`, because it reads
+  `outputs/atlas_evidence.csv` to name the variants the atlas reports, and
+  stops with that instruction when the table is absent.
+- `code/validate.py` after `code/discovery.py`, because `discovery.py` writes
+  `docs/PRE_REGISTRATION.md` and `validate.py` refuses to run until that file is
+  committed and unmodified. Once it is in git, `discovery.py` leaves it alone and
+  reports its fresh estimates in its own report, because rewriting it would put
+  predictions made after the result was known where predictions made before it
+  used to be.
+
+`tests/test_docs.py` reads every module's source and fails if the dependencies
+between them are not exactly the ones listed above, so this cannot drift as
+modules change.
+
+`inspect_mutations.py` caches the gene vocabulary to
+`outputs/gene_vocabulary.csv` and reads it back on a later run, so its report
+records whether the vocabulary was streamed from all 80,069,097 rows or read
+from that cache. The table it writes is the same either way.
 
 ```
 python code/inspect_mutations.py    # structure of the MUTATIONS table
@@ -177,12 +192,13 @@ Outputs are regenerated from the CRyPTIC release and are not tracked.
 pytest
 ```
 
-The suite is 488 tests against synthetic data with known ground truth planted
+The suite is 491 tests against synthetic data with known ground truth planted
 in it: a dataset built to the CRyPTIC schema for the pipeline, and reports
 simulated onto a plate's dilution series for the micecoff package. It needs no
 downloaded data and finishes in about two minutes. One of the tests reads that
 count back from pytest's own collector, so the figure above cannot drift from
-the suite.
+the suite, and three of them read every module's source and fail if the
+dependencies between the modules are not the ones stated above.
 
 It checks the things the results depend on rather than the things that are easy
 to check. That a null call and a het call are not variants and not wild type.

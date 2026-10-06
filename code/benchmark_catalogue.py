@@ -59,8 +59,9 @@ absence of an association is not evidence of resistance.
 Which rows are graded. A called, non-synonymous change carried in every read:
 IS_REAL_VARIANT and not a minor allele. A null call is a position that could not
 be read and is not a detected variant, and a minor allele is reported
-Susceptible by CRyPTIC's own application of this catalogue. Section 7.8 treats
-both the same way, so the rules here and there are comparable.
+Susceptible by CRyPTIC's own application of this catalogue.
+code/prediction_metrics.py treats both the same way, so the rules here and there
+are comparable.
 
 Rows the cohort marks DOUBLE_REPORTED are graded here, which is the one place
 this module departs from cohort.REAL_MAJOR. A large deletion is written twice in
@@ -76,8 +77,8 @@ because the call takes the strongest grade the isolate carries.
 
 The epistasis rule is reported both ways. CRyPTIC apply a rule under which a
 loss-of-function mutation in mmpL5 overrides any resistance-associated mutation
-in Rv0678 and the isolate is called Susceptible. Section 11.1 records that this
-project's own epistasis finding was retracted: the 43 samples carrying both are
+in Rv0678 and the isolate is called Susceptible. This project's own epistasis
+finding was withdrawn on clonality analysis: the 43 samples carrying both are
 2 independent events, not 43. Adopting the rule silently would import a claim
 this cohort does not support, and ignoring it would misrepresent what the
 catalogue does in practice, so both calls are computed and reported side by
@@ -88,7 +89,8 @@ resistance. A three-way breakdown of R, U and S against the phenotype is
 reported beside the two-way confusion, because an isolate graded U is a
 different failure from one graded S.
 
-Intervals resample clusters, through the same functions Section 7.8 uses, so
+Intervals resample clusters, through the same functions
+code/prediction_metrics.py uses, so
 the catalogue's sensitivity and specificity sit on the same footing as the
 project's own rules.
 

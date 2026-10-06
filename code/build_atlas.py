@@ -37,7 +37,7 @@ uncertainty. Every variant below the threshold keeps its counts and carries no
 estimate, with the reason recorded in the row.
 
 The shift is the variant's fitted mean log2 MIC minus the reference group's,
-where the reference group is the 14,187 samples of Section 5.7 that carry no
+where the reference group is the 14,187 samples code/cohort.py defines, which carry no
 real major-allele variant in the three genes. The interval covers the variant's
 own resampling only. The reference group holds about 14,000 measurements and its
 mean carries a standard error near 0.01 doublings, which is an order of

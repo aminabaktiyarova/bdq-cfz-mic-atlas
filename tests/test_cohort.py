@@ -89,8 +89,8 @@ def _classified(rows, gene="Rv0678"):
 
 def test_a_deletion_written_twice_counts_as_one_variant():
     """CRyPTIC reports a large deletion both as a fraction of the gene and as the
-    sequence removed. Section 8.9 of the project record has the thirteen samples
-    in the real table."""
+    sequence removed. Thirteen samples in the real table carry one written both
+    ways."""
     one = "one.sample"
     classified = _classified([(one, "del_0.81", False), (one, "-3_del_438", False)])
     assert classified.loc[(one, "-3_del_438")].DOUBLE_REPORTED

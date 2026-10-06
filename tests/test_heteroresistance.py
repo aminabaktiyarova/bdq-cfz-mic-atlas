@@ -164,9 +164,8 @@ def minor_row(unique_id, mutation, resolved, **flags):
 
 
 def test_a_het_call_counts_even_where_the_minor_flag_says_otherwise(data_dir):
-    """One row in the real table is a het call that IS_MINOR marks false,
-    recorded in Section 3.4 of the project record. It is still a detected
-    sub-population."""
+    """One row in the real table is a het call that IS_MINOR marks false. It is
+    still a detected sub-population."""
     mutations = cohort.load_mutations()
     odd = pd.DataFrame([minor_row("odd.sample", "C46Z", "C46G",
                                   IS_MINOR=False, IS_HET_CALL=True)])

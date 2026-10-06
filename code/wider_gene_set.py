@@ -5,7 +5,7 @@ Run from the project root with the virtual environment active:
 
     python code/wider_gene_set.py
 
-Section 7.7 reports that 80 of 171 bedaquiline-resistant and 527 of 683
+code/unexplained.py reports that 80 of 171 bedaquiline-resistant and 527 of 683
 clofazimine-resistant isolates carry no real major-allele variant in Rv0678,
 pepQ or atpE, and records as a limit that the fraction describes that gene set
 rather than the genome. The obvious objection is that the residue is an artifact
@@ -20,7 +20,7 @@ are taken from it. No grade, confidence or other catalogue content is read
 here, so every figure this module writes is licence-clean and belongs in
 outputs/ beside the rest.
 
-What is compared. The reference group of Section 5.7 is the unexplained tier
+What is compared. The reference group code/cohort.py defines is the unexplained tier
 for a resistant isolate, so the comparison is made inside it: among isolates
 carrying no real major-allele variant in the three genes and nothing uncertain
 in them, does carrying a variant in a candidate gene track resistance. An
@@ -29,7 +29,7 @@ gene, by the same definition the rest of the project uses.
 
 A carrier count on its own answers nothing. mtrB carries a variant in 91 per
 cent of the cohort, so admitting it would empty the unexplained tier the way
-admitting mmpL5 does in Section 7.7, and name no cause. The question is
+admitting mmpL5 does in code/unexplained.py, and name no cause. The question is
 association, not coverage.
 
 Three things are reported against each crude odds ratio, because this
@@ -335,9 +335,9 @@ def main():
         say("that survives the multiplicity correction, an interval that resamples")
         say("clusters, and site stratification with its strata in agreement. Every")
         say("crude association above either fails one of those or rests on a few")
-        say("clonal groups. The unexplained tier of Section 7.7 is not accounted for")
-        say("by these ten genes, which leaves that figure a statement about a named")
-        say("gene set rather than about the genome.")
+        say("clonal groups. The unexplained tier that code/unexplained.py counts")
+        say("is not accounted for by these ten genes, which leaves that figure a")
+        say("statement about a named gene set rather than about the genome.")
     else:
         for row in survives.itertuples():
             say(f"\n{row.gene} against {row.drug} survives: site-adjusted OR "
