@@ -222,8 +222,6 @@ def seed_sweep(frame, drug, label, seeds=SWEEP_SEEDS):
 
 
 def compare(frame, drug, label):
-    import pandas as pd
-
     exposed = frame[frame.EXPOSED]
     reference = frame[~frame.EXPOSED]
     if not len(exposed) or not len(reference):
@@ -259,7 +257,6 @@ def compare(frame, drug, label):
 
 
 def main():
-    import numpy as np
     import pandas as pd
 
     say("=" * 72)

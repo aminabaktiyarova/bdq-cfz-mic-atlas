@@ -373,7 +373,7 @@ def main():
         write_report()
         return
 
-    say(f"\n  DATASET across all WGS samples:")
+    say("\n  DATASET across all WGS samples:")
     say(wgs[dataset_column].value_counts(dropna=False).to_string())
 
     assignment = wgs.drop_duplicates("UNIQUEID").set_index("UNIQUEID")[dataset_column]

@@ -195,7 +195,6 @@ def test_one(frame, mutations, carriers, gene, drug):
     """One gene against one drug, inside the reference group."""
     import math
 
-    import pandas as pd
     from scipy.stats import fisher_exact
 
     subset = frame[frame.IS_REFERENCE & frame[f"MIC_{drug}"].notna()].copy()
@@ -279,8 +278,8 @@ def main():
     order.insert(order.index("p_value") + 1, order.pop(order.index("q_value")))
     table = table[order]
 
-    say(f"\nTwenty tests, ten genes on each of two drugs. "
-        f"Benjamini-Hochberg q is over that family.")
+    say("\nTwenty tests, ten genes on each of two drugs. "
+        "Benjamini-Hochberg q is over that family.")
     for drug in cohort.DRUGS:
         block = table[table.drug.eq(drug)].sort_values("p_value")
         first = block.iloc[0]

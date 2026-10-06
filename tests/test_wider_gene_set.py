@@ -8,7 +8,6 @@ the stratified odds ratio against a planted effect, and the interval against
 the same counts relabelled from independent isolates to a few clones.
 """
 
-import numpy as np
 import pandas as pd
 import pytest
 

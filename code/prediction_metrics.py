@@ -287,7 +287,6 @@ def sweep(frame, flags, drug, thresholds, draws=BOOTSTRAPS):
 
 
 def main():
-    import numpy as np
     import pandas as pd
 
     say("=" * 72)

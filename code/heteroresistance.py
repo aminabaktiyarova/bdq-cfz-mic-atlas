@@ -122,7 +122,6 @@ def call_types(mutations):
     """Per sample, whether its uncertainty is a null call, a detected minor
     allele, or both, and which genes it touches."""
     import numpy as np
-    import pandas as pd
 
     rows = mutations[mutations.GENE.isin(cohort.BDQ_GENES) & mutations.UNCERTAIN]
     per_sample = rows.groupby("UNIQUEID", observed=True).agg(
@@ -443,7 +442,6 @@ def adjusted_rows(frame, drug, rng, draws=None):
     deviation for each group against a reference fitted on its own.
     """
     import numpy as np
-    import pandas as pd
 
     draws = BOOTSTRAPS if draws is None else draws
     masks = group_masks(frame)
@@ -557,7 +555,6 @@ def slope_rows(frame, drug, rng):
 
 
 def main():
-    import numpy as np
     import pandas as pd
 
     say("=" * 72)

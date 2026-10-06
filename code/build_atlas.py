@@ -93,7 +93,6 @@ def subject_variants(mutations, status):
     Raises if the modifier gene reaches the subject column, which is the fault
     that once credited mmpL5 with the repressor's effect.
     """
-    import pandas as pd
 
     solo = status.index[status.IS_SOLO]
     carried = mutations[
@@ -175,7 +174,6 @@ def estimate_shifts(frame, subjects, table, series, rng=None):
     """Add a fitted mean, a shift and an interval to every variant the evidence
     supports, and a reason to every variant it does not."""
     import numpy as np
-    import pandas as pd
 
     rng = rng if rng is not None else np.random.default_rng(SEED)
     carriers = frame.join(subjects, how="inner")
@@ -233,8 +231,6 @@ def estimate_shifts(frame, subjects, table, series, rng=None):
 
 
 def main():
-    import pandas as pd
-
     say("=" * 72)
     say("Per-variant evidence")
     say("=" * 72)

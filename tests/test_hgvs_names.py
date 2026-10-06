@@ -8,7 +8,6 @@ genetic code is round tripped, rather than a few examples being spot checked.
 
 import itertools
 
-import pandas as pd
 import pytest
 
 import hgvs_names as hgvs

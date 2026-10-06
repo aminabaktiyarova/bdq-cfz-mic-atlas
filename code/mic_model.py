@@ -348,7 +348,7 @@ def main():
     say("An excluded row acts only through the value it would have had, so the")
     say("movement it can cause is its share of the group times the gap between")
     say("that value and the fitted mean. The widest gap between a site's fitted")
-    say(f"mean and the whole group's is shown beside it, over sites carrying at")
+    say("mean and the whole group's is shown beside it, over sites carrying at")
     say(f"least {SITE_MINIMUM} placeable intervals.")
     say("")
     say(pd.DataFrame([excluded_sensitivity(df, drug) for drug in cohort.DRUGS]
