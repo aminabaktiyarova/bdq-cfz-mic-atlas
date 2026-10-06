@@ -16,8 +16,9 @@ tqdm==4.70.0
 pytest==9.1.1
 
 # Reads a resistance catalogue in GARC. Used only by code/benchmark_catalogue.py.
-# A pure-Python wheel depending on pandas and ujson alone, both unpinned, so it
-# installs beside the versions above without moving any of them.
+# A pure-Python wheel declaring pandas, ujson, pytest and pytest-cov, all
+# unpinned. It installs beside the versions above without moving any of them,
+# adding ujson, pytest-cov and coverage, which requirements.lock pins.
 piezo==0.9.2
 
 # Deliberately excluded:

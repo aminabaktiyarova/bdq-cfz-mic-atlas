@@ -32,26 +32,36 @@ the authoritative definition:
 
 Two further notes.
 
-The form <position>_minorindel appears in the CRyPTIC tables but is not defined
-in NOMENCLATURE.md, and its definition was not located in the piezo, gumpy or
-gnomonicus source. It is parsed here as an indel of unresolved length at that
-position, and IS_FRAMESHIFT is left as None rather than False, because an
-unknown length is not the same as a length divisible by three. Callers must test
-for True explicitly rather than relying on falsiness. code/check_parsing.py
-profiles these rows against IS_MINOR, FRS and the indel columns so the reading
-rests on evidence rather than on the token's name.
+The form <position>_minorindel appears in the CRyPTIC tables and is spelled
+nowhere in NOMENCLATURE.md or in the piezo, gumpy or gnomonicus source, read at
+piezo 0ffab6d, gumpy 2878b11 and gnomonicus e59af2d. NOMENCLATURE.md defines
+the call it records under Minor populations, where a minor allele is the
+mutation followed by a colon and its read count or FRS. gumpy writes a minor
+indel in that form, as <position>_<ins|del>_<bases>:<support> where one indel
+occupies the position and <position>_indel:<support> where more than one does
+(gumpy/gene.py, minority_populations_GARC). On these rows MINOR_MUTATION
+carries the specific form, such as 141_ins_c, and FRS the read fraction where
+one is recorded, so the token reads as a minor-allele indel whose form the
+MUTATION string omits. That reading is inferred from those columns, since no
+source reachable here documents the spelling. It is parsed here as an indel of
+unresolved length at that position, and IS_FRAMESHIFT is left as None rather
+than False, because an unknown length is not the same as a length divisible by
+three. Callers must test for True explicitly rather than relying on falsiness.
+code/check_parsing.py profiles these rows against IS_MINOR, FRS and the indel
+columns so the reading rests on evidence rather than on the token's name.
 
-The form del_minorindel is the gene-level counterpart and is also undefined in
-NOMENCLATURE.md. Across the whole table it occurs on 15,714 rows in 1,137
-genes, every one with IS_MINOR true and IS_NULL false, and MINOR_MUTATION is
-populated on every one of them with a resolved del_<fraction>. INDEL_LENGTH is
-populated on none of them and FRS is absent throughout, which is where it
-differs from the positional form. It is parsed here as a gene deletion whose
-fraction the string does not carry, so DELETED_FRACTION is None and
-SIZE_RESOLVED is False, and the fraction is read from MINOR_MUTATION by a
-caller that needs it. No row of this form appears in the genes this project
-analyses, so it reaches no figure; it is handled because the parser must not
-fail on a gene outside that set.
+The form del_minorindel is the gene-level counterpart. It is spelled nowhere in
+the same three sources, and gumpy at that commit writes del_<fraction> only
+among major calls (gumpy/difference.py), with no gene-level form for a minor
+call. Across the whole table it occurs on 15,714 rows in 1,137 genes, every one
+with IS_MINOR true and IS_NULL false, and MINOR_MUTATION is populated on every
+one of them with a resolved del_<fraction>. INDEL_LENGTH is populated on none
+of them and FRS is absent throughout, which is where it differs from the
+positional form. It is parsed here as a gene deletion whose fraction the string
+does not carry, so DELETED_FRACTION is None and SIZE_RESOLVED is False, and the
+fraction is read from MINOR_MUTATION by a caller that needs it. No row of this
+form appears in the genes this project analyses, so it reaches no figure; it is
+handled because the parser must not fail on a gene outside that set.
 
 A fractional gene deletion has no single position and no residues, so POSITION,
 REF_RESIDUE and ALT_RESIDUE are None for it and DELETED_FRACTION carries the
