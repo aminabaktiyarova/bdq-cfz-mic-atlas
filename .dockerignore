@@ -1,0 +1,14 @@
+# Nothing below enters the build context, so none of it can reach the image:
+# the CRyPTIC data, the restricted-license and personal-data inputs, derived
+# outputs, the local environment, version control, and build products.
+data/
+quarantine/
+outputs/
+.venv/
+.git/
+**/__pycache__/
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+**/.DS_Store

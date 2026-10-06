@@ -4,8 +4,9 @@ Tests that the repository's documentation matches what the code produces.
 A column released without an entry in the data dictionary ships undocumented,
 and an entry for a column that does not exist misleads. The atlas table is
 checked against a run on the synthetic dataset, in tests/test_atlas.py. The
-remaining tables are checked here against whatever the modules last wrote, so
-this passes on a machine that has never downloaded the CRyPTIC data.
+remaining tables are checked here against whatever the modules last wrote, and
+a table not yet written is skipped, so the suite collects the same tests and
+passes in a fresh clone that has never downloaded the CRyPTIC data.
 """
 
 import csv
@@ -33,21 +34,37 @@ def written_tables():
     return sorted((ROOT / "outputs").glob("*.csv"))
 
 
+def listed_tables():
+    """The tables the README's outputs section says the modules write."""
+    readme = (ROOT / "README.md").read_text()
+    section = readme.split("\n## Outputs\n")[1].split("\n## ")[0]
+    return sorted(set(re.findall(r"`([\w.]+\.csv)`", section)))
+
+
 def test_the_dictionary_exists_and_names_its_tables():
     text = DICTIONARY.read_text()
     assert "# Data dictionary" in text
     assert re.findall(r"^## outputs/[\w.]+\.csv$", text, re.M)
 
 
-@pytest.mark.parametrize("name", [path.name for path in written_tables()]
-                         or ["no table written yet"])
-def test_every_written_table_is_documented(name):
-    if name == "no table written yet":
-        pytest.skip("no derived table on disk; run the modules first")
-    columns = next(csv.reader((ROOT / "outputs" / name).open()))
+@pytest.mark.parametrize("name", listed_tables())
+def test_every_listed_table_matches_its_dictionary_entry(name):
+    """
+    Parametrized over the tables the README lists, so the tests collected do
+    not depend on what is on disk. The dictionary entry is required whether or
+    not the table has been written; its columns are compared once it has.
+    """
     documented = documented_columns(name)
     assert documented is not None, f"{name} has no section in the data dictionary"
-    assert columns == documented
+    path = ROOT / "outputs" / name
+    if not path.exists():
+        pytest.skip(f"{name} has not been written; run the module that writes it")
+    assert next(csv.reader(path.open())) == documented
+
+
+def test_every_written_table_is_listed_in_the_readme():
+    """A table on disk that the README does not list escapes the check above."""
+    assert {path.name for path in written_tables()} <= set(listed_tables())
 
 
 def runnable_modules():
@@ -152,14 +169,21 @@ def test_the_readme_names_every_document():
     assert not missing
 
 
-def test_the_results_document_cites_only_tables_that_exist():
+def test_the_results_document_cites_only_tables_the_pipeline_writes():
+    """
+    Every cited table is one the README lists as written by a module, which
+    holds in a fresh clone. Where tables have been written, every cited one is
+    among them.
+    """
     results = ROOT / "docs" / "RESULTS.md"
     if not results.exists():
         pytest.skip("no results document")
     cited = set(re.findall(r"outputs/([\w.]+\.csv)", results.read_text()))
     assert cited
-    present = {path.name for path in (ROOT / "outputs").glob("*.csv")}
-    assert cited <= present
+    assert cited <= set(listed_tables())
+    present = {path.name for path in written_tables()}
+    if present:
+        assert cited <= present
 
 
 def test_the_results_document_names_no_quarantined_table():

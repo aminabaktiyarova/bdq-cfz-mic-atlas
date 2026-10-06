@@ -26,8 +26,8 @@ censoring intervals:
 
 with lower = -infinity for a left-censored value and upper = +infinity for a
 right-censored one. This is the approach the CRyPTIC ECOFF paper uses to define
-wild-type distributions, reimplemented here as reusable code rather than
-being reconstructed from a paper.
+wild-type distributions. The estimator itself is in micecoff/core.py, which
+this module and the micecoff command line tool share.
 
 The estimate that matters is the shift: the difference in fitted mean log2 MIC
 between a variant group and the reference group, in doublings. That is the
@@ -46,9 +46,26 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(1, str(Path(__file__).resolve().parent.parent))
 
 import cohort  # noqa: E402
 from cluster_adjust import add_clusters  # noqa: E402
+
+# The estimator is the micecoff package's. These names are imported here, under
+# the names this module has always exported, so the analysis modules and the
+# tests that import them from mic_model run the package's code.
+from micecoff.core import (  # noqa: E402,F401
+    check_doubling_series,
+    fit_censored_linear,
+    fit_censored_normal,
+    log_density_ratios,
+    log_interval_mass,
+    mic_bounds,
+    mic_recorded,
+    named_generator,
+    parse_concentration,
+    simulate_reports,
+)
 
 REPORT = Path("outputs/mic_model_report.txt")
 ESTIMATES = Path("outputs/mic_estimates.csv")
@@ -71,9 +88,7 @@ def stream(name):
     which other estimates were computed before it and can be reproduced on its
     own.
     """
-    import numpy as np
-
-    return np.random.default_rng([SEED] + [ord(letter) for letter in name])
+    return named_generator(SEED, name)
 
 
 def write_report():
@@ -87,34 +102,6 @@ def die(message):
     sys.exit(1)
 
 
-def parse_concentration(value):
-    """
-    Read one CONC entry as a number.
-
-    PLATE_LAYOUT stores CONC as text rather than the float the schema document
-    describes, and the entries carry censoring operators: the lowest well reads
-    "<=0.008" and the off-plate bin above the highest well reads ">1". The
-    number in both cases is a tested concentration, the lowest and the highest
-    respectively, so stripping the operator and deduplicating recovers the
-    tested ladder exactly. Returns (concentration, operator or None).
-    """
-    if value is None:
-        return None, None
-    text = str(value).strip()
-    if text in ("", "nan", "None"):
-        return None, None
-    operator = None
-    for candidate in ("<=", ">=", "<", ">"):
-        if text.startswith(candidate):
-            operator = candidate
-            text = text[len(candidate):].strip()
-            break
-    try:
-        return float(text), operator
-    except ValueError:
-        return None, None
-
-
 def concentration_series():
     """
     The tested concentrations for each plate design and drug, from PLATE_LAYOUT.
@@ -123,7 +110,6 @@ def concentration_series():
     validated as a doubling ladder, because the censoring interval below each
     reported value is assumed to be half of it.
     """
-    import numpy as np
     import pandas as pd
 
     layout = pd.read_parquet(cohort.DATA / "PLATE_LAYOUT.parquet")
@@ -144,71 +130,14 @@ def concentration_series():
         concentrations = sorted(concentrations)
         if len(concentrations) < 2:
             continue
-        ratios = np.array(concentrations[1:]) / np.array(concentrations[:-1])
-        # CRyPTIC label concentrations as rounded values, so a true doubling
-        # series reads as ratios between about 1.87 and 2.09 rather than exactly
-        # 2. A skipped dilution would give a ratio near 4, which is what this
-        # check is for.
-        if ((ratios < 1.7) | (ratios > 2.4)).any():
-            irregular.append((design, drug, [round(float(r), 3) for r in ratios]))
+        # CRyPTIC label concentrations as rounded values, so a doubling series
+        # reads as ratios between about 1.87 and 2.09. A skipped dilution gives
+        # a ratio near 4, which is what this check is for.
+        ratios, regular = check_doubling_series(concentrations)
+        if not regular:
+            irregular.append((design, drug, [round(r, 3) for r in ratios]))
         series[(design, drug)] = concentrations
     return series, irregular, unreadable
-
-
-def mic_bounds(mic_text, concentrations):
-    """
-    Convert one reported MIC into the log2 interval it represents.
-
-    Returns (lower, upper) in log2 units, with -inf or +inf at a censored end,
-    or None if the value cannot be placed on the tested series.
-    """
-    import numpy as np
-
-    text = str(mic_text).strip()
-    if text in ("", "nan", "None"):
-        return None
-
-    if text.startswith("<="):
-        value = float(text[2:])
-        return (-np.inf, np.log2(value))
-    if text.startswith(">="):
-        value = float(text[2:])
-        return (np.log2(value) - 1.0, np.inf)
-    if text.startswith(">"):
-        value = float(text[1:])
-        return (np.log2(value), np.inf)
-
-    try:
-        value = float(text)
-    except ValueError:
-        return None
-
-    position = None
-    for index, concentration in enumerate(concentrations):
-        if abs(concentration - value) / value < 0.05:
-            position = index
-            break
-    if position is None:
-        return None
-    if position == 0:
-        return (-np.inf, np.log2(value))
-    return (np.log2(concentrations[position - 1]), np.log2(value))
-
-
-def mic_recorded(value):
-    """
-    True when a reading was recorded for this sample.
-
-    A plate that produced no MIC stores a null, and the null arrives here as
-    None, as a float nan, or as a pandas missing value depending on the pandas
-    version reading the parquet file. A sample with no MIC is a missing
-    measurement, not a value that failed to match the tested series.
-    """
-    import pandas as pd
-
-    if value is None or pd.isna(value):
-        return False
-    return str(value).strip() not in ("", "nan", "None", "<NA>")
 
 
 def place_mics(mic_texts, designs, series, drug):
@@ -240,180 +169,7 @@ def place_mics(mic_texts, designs, series, drug):
     return lowers, uppers, absent, off_series
 
 
-def log_interval_mass(lower, upper):
-    """
-    Log of the standard normal probability mass on each interval [lower, upper].
-
-    Written with logcdf, logsf and log1p rather than as the difference of two
-    cdfs. Far out in a tail the two cdfs agree to most of their digits and
-    subtracting them destroys the rest: the bedaquiline reference group holds
-    intervals carrying a mass of 3e-09, where the difference loses enough
-    precision to corrupt the gradient and stop the optimiser short of the
-    maximum. Each interval is evaluated in the tail it lies in, so the only
-    subtraction is of a number below one from one, inside log1p.
-    """
-    import numpy as np
-    from scipy.stats import norm
-
-    lower = np.asarray(lower, dtype=float)
-    upper = np.asarray(upper, dtype=float)
-    result = np.empty(len(lower))
-
-    left = np.isneginf(lower)
-    right = np.isposinf(upper)
-    result[left] = norm.logcdf(upper[left])
-    result[right] = norm.logsf(lower[right])
-
-    middle = ~left & ~right
-    low, high = lower[middle], upper[middle]
-    mass = np.empty(len(low))
-    in_upper_tail = low > 0
-    tail_low = norm.logsf(low[in_upper_tail])
-    tail_high = norm.logsf(high[in_upper_tail])
-    mass[in_upper_tail] = tail_low + np.log1p(-np.exp(tail_high - tail_low))
-    body_low = norm.logcdf(low[~in_upper_tail])
-    body_high = norm.logcdf(high[~in_upper_tail])
-    mass[~in_upper_tail] = body_high + np.log1p(-np.exp(body_low - body_high))
-    result[middle] = mass
-    return result
-
-
-def log_density_ratios(lower, upper, log_mass):
-    """
-    The standard normal density at each interval bound, divided by the mass on
-    that interval, returned as a pair of arrays.
-
-    Both ratios are formed in log space for the same reason log_interval_mass
-    is: where the mass is 1e-09 the density and the mass are both tiny, their
-    quotient is of order one, and forming it directly loses the digits that
-    carry it. An infinite bound contributes a density of zero.
-    """
-    import numpy as np
-    from scipy.stats import norm
-
-    ratios = []
-    for bound in (np.asarray(lower, dtype=float), np.asarray(upper, dtype=float)):
-        finite = np.isfinite(bound)
-        ratio = np.zeros(len(bound))
-        ratio[finite] = np.exp(norm.logpdf(bound[finite]) - log_mass[finite])
-        ratios.append(ratio)
-    return ratios[0], ratios[1]
-
-
-def fit_censored_normal(lower, upper):
-    """
-    Maximum likelihood mean and standard deviation of a normal distribution
-    observed only through censoring intervals.
-    """
-    import numpy as np
-    from scipy.optimize import minimize
-
-    lower = np.asarray(lower, dtype=float)
-    upper = np.asarray(upper, dtype=float)
-
-    finite = np.concatenate([lower[np.isfinite(lower)], upper[np.isfinite(upper)]])
-    if not len(finite):
-        return None
-    start = np.array([float(np.mean(finite)), np.log(max(float(np.std(finite)), 0.5))])
-
-    def negative_log_likelihood(parameters):
-        mu, log_sigma = parameters
-        sigma = np.exp(log_sigma)
-        return -np.sum(log_interval_mass((lower - mu) / sigma, (upper - mu) / sigma))
-
-    result = minimize(
-        negative_log_likelihood, start, method="L-BFGS-B",
-        bounds=[(-25, 25), (np.log(0.05), np.log(20))],
-    )
-    if not result.success:
-        return None
-    return {"mu": float(result.x[0]), "sigma": float(np.exp(result.x[1]))}
-
-
-def fit_censored_linear(lower, upper, design):
-    """
-    Maximum likelihood fit of a normal whose mean is a linear function of the
-    columns of `design`, observed only through censoring intervals.
-
-    The same likelihood as fit_censored_normal, with the mean replaced by
-    design @ beta, and with the gradient supplied in closed form. A group
-    indicator beside a set of site indicators gives that group's shift with
-    site held constant, which a single group mean cannot do when the group
-    sits mostly at one site.
-
-    Returns {"beta": array, "sigma": float}, or None where the fit does not
-    converge. beta[0] is the intercept where the first column is ones.
-    """
-    import numpy as np
-    from scipy.optimize import minimize
-
-    lower = np.asarray(lower, dtype=float)
-    upper = np.asarray(upper, dtype=float)
-    design = np.asarray(design, dtype=float)
-    if design.ndim != 2 or len(design) != len(lower):
-        raise ValueError("design must be one row per observation")
-
-    finite = np.concatenate([lower[np.isfinite(lower)], upper[np.isfinite(upper)]])
-    if not len(finite):
-        return None
-    start = np.zeros(design.shape[1] + 1)
-    start[0] = float(finite.mean())
-    start[-1] = np.log(max(float(finite.std()), 0.5))
-
-    def negative_log_likelihood(parameters):
-        """The objective and its gradient, which share the interval mass."""
-        mu = design @ parameters[:-1]
-        sigma = np.exp(parameters[-1])
-        low = (lower - mu) / sigma
-        high = (upper - mu) / sigma
-        log_mass = log_interval_mass(low, high)
-        at_low, at_high = log_density_ratios(low, high, log_mass)
-        # An infinite bound carries a density ratio of zero, and is replaced
-        # by zero before the multiplication rather than after it, so that the
-        # product is never an infinity against a zero.
-        finite_low = np.where(np.isfinite(low), low, 0.0)
-        finite_high = np.where(np.isfinite(high), high, 0.0)
-        gradient = np.empty(len(parameters))
-        gradient[:-1] = design.T @ ((at_high - at_low) / sigma)
-        gradient[-1] = np.sum(finite_high * at_high - finite_low * at_low)
-        return -np.sum(log_mass), gradient
-
-    bounds = [(-25, 25)] + [(-30, 30)] * (design.shape[1] - 1) + [
-        (np.log(0.05), np.log(20))]
-    # The default stopping rule halts about 2e-04 of log likelihood short of
-    # the maximum here, which is enough to move a shift in its third decimal.
-    # With the gradient in closed form the tighter rule costs 0.03 s.
-    result = minimize(negative_log_likelihood, start, method="L-BFGS-B",
-                      jac=True, bounds=bounds,
-                      options={"ftol": 1e-14, "gtol": 1e-9, "maxiter": 2000})
-    if not result.success:
-        return None
-    return {"beta": result.x[:-1], "sigma": float(np.exp(result.x[-1]))}
-
-
 PLANTED = [(-5.0, 1.0), (-6.5, 1.0), (-7.5, 1.2), (-2.0, 1.5), (-4.0, 0.8)]
-
-
-def simulate_reports(mu, sd, concentrations, rng, draws=4000):
-    """Draw log2 MICs from a known distribution and report them as a plate would.
-
-    A plate reports the lowest tested concentration that inhibited growth, so a
-    draw at or below the first well comes back censored at that well and one
-    above the last comes back censored above it.
-    """
-    import numpy as np
-
-    steps = np.log2(np.asarray(concentrations))
-    reported = []
-    for value in rng.normal(mu, sd, draws):
-        index = int(np.searchsorted(steps, value))
-        if index == 0:
-            reported.append(f"<={concentrations[0]}")
-        elif index >= len(steps):
-            reported.append(f">{concentrations[-1]}")
-        else:
-            reported.append(f"{concentrations[index]}")
-    return reported
 
 
 def validate_estimator(concentrations, rng, draws=4000):

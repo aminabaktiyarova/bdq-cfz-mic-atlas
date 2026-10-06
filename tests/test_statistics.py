@@ -296,6 +296,7 @@ def test_a_committed_pre_registration_is_left_alone(tmp_path, monkeypatch):
     registered = tmp_path / "PRE_REGISTRATION.md"
     registered.write_text("the registered predictions\n")
     monkeypatch.setattr(discovery, "PREREG", registered)
+    monkeypatch.setattr(discovery, "in_a_git_repository", lambda: True)
     monkeypatch.setattr(discovery, "prereg_is_registered", lambda: True)
     discovery._lines.clear()
 
@@ -307,6 +308,7 @@ def test_a_committed_pre_registration_is_left_alone(tmp_path, monkeypatch):
 def test_a_pre_registration_not_yet_committed_is_written(tmp_path, monkeypatch):
     target = tmp_path / "PRE_REGISTRATION.md"
     monkeypatch.setattr(discovery, "PREREG", target)
+    monkeypatch.setattr(discovery, "in_a_git_repository", lambda: True)
     monkeypatch.setattr(discovery, "prereg_is_registered", lambda: False)
     discovery._lines.clear()
 
@@ -315,6 +317,28 @@ def test_a_pre_registration_not_yet_committed_is_written(tmp_path, monkeypatch):
     assert "Pre-registration" in written
     assert "No comparison in the discovery half reaches an effect size" in written, \
         "with no powered comparison the document has to say so rather than be empty"
+
+
+def test_outside_a_git_repository_the_pre_registration_is_left_alone(tmp_path,
+                                                                     monkeypatch):
+    """
+    In a directory git does not manage, as in a container built without the
+    repository's history, git cannot say whether the document is registered,
+    and a guard that read that as unregistered would rewrite it.
+    """
+    outside = tmp_path / "unpacked"
+    (outside / "docs").mkdir(parents=True)
+    relative = Path("docs/PRE_REGISTRATION.md")
+    (outside / relative).write_text("the registered predictions\n")
+    monkeypatch.chdir(outside)
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path))
+    monkeypatch.setattr(discovery, "PREREG", relative)
+    discovery._lines.clear()
+
+    assert discovery.in_a_git_repository() is False
+    assert discovery.write_prereg([]) is False
+    assert (outside / relative).read_text() == "the registered predictions\n"
+    assert "is not a git repository" in "\n".join(discovery._lines)
 
 
 def test_a_pre_registration_counts_as_registered_only_once_git_holds_it(tmp_path,
@@ -334,6 +358,7 @@ def test_a_pre_registration_counts_as_registered_only_once_git_holds_it(tmp_path
     monkeypatch.setattr(discovery, "PREREG", relative)
 
     run("init", "-q")
+    assert discovery.in_a_git_repository() is True
     assert discovery.prereg_is_registered() is False, \
         "a file git does not track is a draft, whatever it says"
 

@@ -1,12 +1,16 @@
 cff-version: 1.2.0
-message: "If you use this software or the data it produces, please cite it as below."
+# The repository has made no release, so this entry carries no version and no
+# release date. Both are set when a release is made.
+message: "If you use this software, cite it as below. Cite the atlas table with docs/ATLAS_CITATION.cff."
 title: "bdq-cfz-mic-atlas: a quantitative atlas of Rv0678 and MmpL5 mutation effects on bedaquiline and clofazimine MICs"
 abstract: >-
   An open, versioned resource quantifying how mutations in the Rv0678 and MmpL5
   efflux axis shift bedaquiline and clofazimine minimum inhibitory
   concentrations in Mycobacterium tuberculosis, together with a reproducible
   pipeline that regenerates the resource against each new release of the
-  CRyPTIC Consortium Dataset.
+  CRyPTIC Consortium Dataset. The interval-censored estimator the pipeline uses
+  is packaged as micecoff, whose command line interface fits MIC distributions,
+  the shift between groups and epidemiological cut-offs from a CSV of readings.
 type: software
 authors:
   - family-names: "Baktiyarova"
@@ -25,8 +29,10 @@ keywords:
   - MmpL5
   - cross-resistance
   - genomic epidemiology
+  - interval censoring
+  - epidemiological cut-off
 references:
-  - type: dataset
+  - type: data
     title: "The CRyPTIC Consortium Dataset"
     version: "v3.4.0"
     doi: "10.5281/zenodo.15680920"

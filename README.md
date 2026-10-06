@@ -54,6 +54,7 @@ mutation strings in `MUTATIONS.parquet`.
 
 ```
 code/         analysis and pipeline code (MIT)
+micecoff/     the interval-censored estimator as an installable package (MIT)
 data/         CRyPTIC source tables, downloaded by the user, not tracked
 quarantine/   restricted-licence and personal-data inputs, not tracked
 docs/         provenance record, results, pre-registration, data dictionary
@@ -117,6 +118,40 @@ there, while the confusion cells and the metrics derived from them are
 measurements of the catalogue's performance and are released. `LICENSES.md`
 states the position.
 
+## Container image
+
+`Dockerfile` builds the analysis environment as an image: Python 3.14.7 and
+every package at the version and sha256 recorded in `requirements.lock`. The
+lock holds each pin in `requirements.txt` at the same version and fixes every
+other package at the version installed in the environment that produced the
+released outputs, and the base image is pinned by digest. No data enters the
+image: the CRyPTIC tables are mounted read-only at /bdq-cfz-mic-atlas/data, and
+the derived tables are written to a directory mounted at
+/bdq-cfz-mic-atlas/outputs.
+
+```
+docker build -t bdq-cfz-mic-atlas .
+docker run --rm bdq-cfz-mic-atlas
+docker run --rm -v "$PWD/data:/bdq-cfz-mic-atlas/data:ro" -v "$PWD/outputs:/bdq-cfz-mic-atlas/outputs" bdq-cfz-mic-atlas python code/mic_model.py
+docker run --rm -v "$PWD:/work" bdq-cfz-mic-atlas micecoff fit /work/mics.csv --series 0.008,0.015,0.03,0.06,0.12,0.25,0.5,1
+```
+
+The second command runs the test suite, which needs no data. The image carries
+no git history, so `validate.py` refuses to run in it and `discovery.py` leaves
+the pre-registration alone; both run from a clone. `benchmark_catalogue.py`
+reads the quarantined catalogue, which the image does not hold, and runs in the
+image only with `quarantine/` mounted at /bdq-cfz-mic-atlas/quarantine.
+
+## The micecoff package
+
+The interval-censored estimator is packaged as `micecoff`, with a command line
+interface that fits MIC distributions, shifts between groups and
+epidemiological cut-offs from a CSV of readings. `code/mic_model.py` and the
+modules that import from it run the package's estimator, so the pipeline and
+the command line tool share one implementation. `pip install .` from the
+repository root installs it; `micecoff/README.md` covers its input, commands,
+output columns, intervals and limitations.
+
 ## Outputs
 
 `outputs/` holds a readable report beside each table. Every column of every
@@ -142,10 +177,12 @@ Outputs are regenerated from the CRyPTIC release and are not tracked.
 pytest
 ```
 
-The suite is 273 tests against a synthetic dataset built to the CRyPTIC schema
-with known ground truth planted in it, so it needs no downloaded data and
-finishes in about a minute. One of the tests reads that count back from
-pytest's own collector, so the figure above cannot drift from the suite.
+The suite is 488 tests against synthetic data with known ground truth planted
+in it: a dataset built to the CRyPTIC schema for the pipeline, and reports
+simulated onto a plate's dilution series for the micecoff package. It needs no
+downloaded data and finishes in about two minutes. One of the tests reads that
+count back from pytest's own collector, so the figure above cannot drift from
+the suite.
 
 It checks the things the results depend on rather than the things that are easy
 to check. That a null call and a het call are not variants and not wild type.
@@ -174,6 +211,15 @@ pairs in the genetic code.
 
 Each test was verified by breaking the code it covers and confirming the test
 fails.
+
+## Citing
+
+Cite the software with `CITATION.cff` and the atlas table,
+`outputs/atlas_evidence.csv`, with `docs/ATLAS_CITATION.cff`. The table has no
+persistent identifier until it is deposited, so a citation of it names the
+commit of this repository that produced the copy used. Both entries cite the
+CRyPTIC Consortium Dataset v3.4.0, version DOI 10.5281/zenodo.15680920, from
+which every table derives.
 
 ## Licensing
 

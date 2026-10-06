@@ -1,0 +1,5 @@
+# The source distribution carries the micecoff package alone. The repository's
+# README describes the atlas, and its tests exercise the analysis pipeline,
+# whose modules are not part of the package.
+exclude README.md
+prune tests

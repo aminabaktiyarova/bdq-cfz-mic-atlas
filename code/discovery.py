@@ -527,6 +527,18 @@ def main():
         say("The commit timestamp is what makes the ordering verifiable.")
 
 
+def in_a_git_repository():
+    """Whether git can say what it tracks here.
+
+    Outside a repository, git ls-files fails as it does for an untracked file,
+    so a run there, in a container or an unpacked archive, would read the
+    pre-registration as a draft and rewrite it. This tells the two apart.
+    """
+    result = subprocess.run(["git", "rev-parse", "--git-dir"],
+                            capture_output=True, text=True, check=False)
+    return result.returncode == 0
+
+
 def prereg_is_registered():
     """Whether git tracks the pre-registration, staged or committed.
 
@@ -549,6 +561,12 @@ def write_prereg(rows):
     alone and reports the fresh estimates in the discovery report instead.
     Returns whether the document was written.
     """
+    if not in_a_git_repository():
+        say("")
+        say(f"This directory is not a git repository, so whether {PREREG} is")
+        say("registered cannot be checked, and it is not rewritten. A new")
+        say("pre-registration is written only from a clone of the repository.")
+        return False
     if prereg_is_registered():
         say("")
         say(f"{PREREG} is in git, so it is not rewritten. Its predictions were")

@@ -547,3 +547,96 @@ def test_an_interval_in_the_far_tail_is_where_the_mass_underflows():
     assert 0 < result["smallest"] < 1e-08, \
         "a mass this small is a number, and a difference of two cumulative "\
         "functions would return zero for it"
+
+
+# The estimator lives in the micecoff package. These tests hold mic_model to it.
+
+
+MOVED = ["parse_concentration", "mic_bounds", "mic_recorded", "log_interval_mass",
+         "log_density_ratios", "fit_censored_normal", "fit_censored_linear",
+         "simulate_reports"]
+
+
+def test_the_estimator_this_module_exports_is_the_packages():
+    """
+    The analysis modules import these names from mic_model. Each must be the
+    package's own function, so the pipeline and the command line tool run one
+    estimator and a fix to it reaches both.
+    """
+    import mic_model
+    from micecoff import core
+
+    for name in MOVED:
+        assert getattr(mic_model, name) is getattr(core, name), name
+
+
+def test_the_streams_follow_the_documented_seed():
+    """
+    Every published interval was drawn from a generator seeded by 20260101 and
+    the code points of the quantity's name. A change to that scheme moves every
+    interval in the released tables, so it is held here to the numbers numpy
+    gives for the scheme written out.
+    """
+    import mic_model
+
+    assert mic_model.SEED == 20260101
+    for name in ("BDQ reference", "CFZ Rv0678 promoter", "BDQ lineage4 substitution"):
+        expected = np.random.default_rng([20260101] + [ord(c) for c in name])
+        assert np.array_equal(stream(name).random(4), expected.random(4))
+
+
+def test_a_skipped_dilution_and_an_unreadable_well_are_reported(tmp_path,
+                                                                 monkeypatch):
+    """
+    A layout whose bedaquiline series skips 0.5 and carries a positive-control
+    well recorded as 0, beside a clean clofazimine series. The skipped dilution
+    is reported with its ratios rounded to three decimals, where 0.25 over 0.12
+    is 2.0833, the control well as unreadable, and both series are still
+    returned.
+    """
+    import cohort
+
+    layout = pd.DataFrame({
+        "PLATEDESIGN": ["UKMYC6"] * 9,
+        "DRUG": ["BDQ"] * 6 + ["CFZ"] * 3,
+        "CONC": ["<=0.12", "0.25", "1", "2", ">2", "0",
+                 "<=0.03", "0.06", ">0.06"],
+    })
+    layout.to_parquet(tmp_path / "PLATE_LAYOUT.parquet")
+    monkeypatch.setattr(cohort, "DATA", tmp_path)
+
+    series, irregular, unreadable = concentration_series()
+    assert series[("UKMYC6", "BDQ")] == [0.12, 0.25, 1.0, 2.0]
+    assert series[("UKMYC6", "CFZ")] == [0.03, 0.06]
+    assert irregular == [("UKMYC6", "BDQ", [2.083, 4.0, 2.0])]
+    assert unreadable == [("UKMYC6", "BDQ", "0")]
+
+
+def test_the_module_run_as_a_script_imports_the_repositorys_estimator(tmp_path):
+    """
+    python code/mic_model.py puts code/ on the path and nothing else. The module
+    then has to reach the micecoff package in this repository. A decoy package
+    of the same name on PYTHONPATH stands in for a copy installed elsewhere,
+    which must not take its place.
+    """
+    import os
+    import pathlib
+    import subprocess
+    import sys
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    decoy = tmp_path / "decoy" / "micecoff"
+    decoy.mkdir(parents=True)
+    (decoy / "__init__.py").write_text("")
+    program = (
+        "import sys; sys.path.insert(0, sys.argv[1]); import mic_model, micecoff; "
+        "print(micecoff.__file__)"
+    )
+    environment = dict(os.environ, PYTHONPATH=str(tmp_path / "decoy"),
+                       PYTHONDONTWRITEBYTECODE="1")
+    result = subprocess.run([sys.executable, "-c", program, str(root / "code")],
+                            cwd=tmp_path, env=environment, capture_output=True,
+                            text=True, timeout=120)
+    assert result.returncode == 0, result.stderr
+    loaded = pathlib.Path(result.stdout.strip()).resolve()
+    assert loaded == root / "micecoff" / "__init__.py"

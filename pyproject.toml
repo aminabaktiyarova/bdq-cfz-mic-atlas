@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "micecoff"
+dynamic = ["version"]
+description = "Interval-censored estimation of MIC distributions and epidemiological cut-offs"
+readme = "micecoff/README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Amina Baktiyarova", email = "aminabaktiyarova.e@gmail.com" }]
+keywords = [
+    "minimum inhibitory concentration",
+    "interval censoring",
+    "epidemiological cut-off",
+    "antimicrobial susceptibility",
+]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+]
+
+[project.scripts]
+micecoff = "micecoff.cli:main"
+
+[project.urls]
+Repository = "https://github.com/aminabaktiyarova/bdq-cfz-mic-atlas"
+
+[tool.setuptools]
+packages = ["micecoff"]
+
+[tool.setuptools.dynamic]
+version = { attr = "micecoff.__version__" }

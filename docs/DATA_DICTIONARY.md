@@ -10,7 +10,8 @@ BASHTHEBUG_CLASSIFICATIONS. See `LICENSES.md`.
 
 Concentrations are in mg/L. A mean or a bound written as log2 is the base-2
 logarithm of a concentration in mg/L; a shift is in doublings of MIC, so a
-shift of 1.0 is a doubling.
+shift of 1.0 is a doubling. The micecoff command writes its own tables, which
+this project does not release, and `micecoff/README.md` defines their columns.
 
 ---
 
