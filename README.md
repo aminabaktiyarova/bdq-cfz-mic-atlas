@@ -231,12 +231,13 @@ fails.
 ## Citing
 
 Cite the software with `CITATION.cff` and the released data tables with
-`docs/DATA_CITATION.cff`. The tables are deposited at Zenodo under
-version DOI 10.5281/zenodo.23194535, and the concept DOI
-10.5281/zenodo.23194534 resolves to the latest version. A copy regenerated from
-this repository is cited by the commit that produced it. Both entries cite the
-CRyPTIC Consortium Dataset v3.4.0, version DOI 10.5281/zenodo.15680920, from
-which every table derives.
+`docs/DATA_CITATION.cff`. The software is archived at Zenodo under version DOI
+10.5281/zenodo.23196270, and the concept DOI 10.5281/zenodo.23196269 resolves
+to the latest release. The tables are deposited under version DOI
+10.5281/zenodo.23194535, and the concept DOI 10.5281/zenodo.23194534 resolves
+to the latest version. A copy regenerated from this repository is cited by the
+commit that produced it. Both entries cite the CRyPTIC Consortium Dataset
+v3.4.0, version DOI 10.5281/zenodo.15680920, from which every table derives.
 
 ## Licensing
 

@@ -1,6 +1,7 @@
 cff-version: 1.2.0
-# The repository has made no release, so this entry carries no version and no
-# release date. Both are set when a release is made.
+# The release is archived at Zenodo. The DOI below is the version DOI, which
+# cites the release tagged v0.1.0; the concept DOI under identifiers resolves
+# to the latest release. The version carried here is the one micecoff reports.
 message: "If you use this software, cite it as below. Cite the released data tables with docs/DATA_CITATION.cff."
 title: "bdq-cfz-mic-atlas: a quantitative atlas of Rv0678 and MmpL5 mutation effects on bedaquiline and clofazimine MICs"
 abstract: >-
@@ -12,6 +13,13 @@ abstract: >-
   is packaged as micecoff, whose command line interface fits MIC distributions,
   the shift between groups and epidemiological cut-offs from a CSV of readings.
 type: software
+doi: "10.5281/zenodo.23196270"
+version: "0.1.0"
+date-released: "2026-10-06"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.23196269"
+    description: "The concept DOI, which resolves to the latest release."
 authors:
   - family-names: "Baktiyarova"
     given-names: "Amina"

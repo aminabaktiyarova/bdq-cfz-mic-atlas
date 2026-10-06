@@ -18,8 +18,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 CFF = ROOT / "CITATION.cff"
 DATA = ROOT / "docs" / "DATA_CITATION.cff"
 ORCID = "0009-0007-6265-6493"
-VERSION_DOI = "10.5281/zenodo.23194535"
-CONCEPT_DOI = "10.5281/zenodo.23194534"
+SOFTWARE_DOI = "10.5281/zenodo.23196270"
+SOFTWARE_CONCEPT_DOI = "10.5281/zenodo.23196269"
+DATA_DOI = "10.5281/zenodo.23194535"
+DATA_CONCEPT_DOI = "10.5281/zenodo.23194534"
 NUMBER_WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven",
                 "eight", "nine", "ten", "eleven", "twelve", "thirteen",
                 "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
@@ -37,6 +39,11 @@ def first_author(path=CFF):
     block = path.read_text().split("\nauthors:\n")[1].split("\n  - ")[0]
     return {key: values(key, block)[0]
             for key in ("family-names", "given-names", "orcid", "affiliation")}
+
+
+def citing_section():
+    section = (ROOT / "README.md").read_text().split("\n## Citing\n")[1]
+    return " ".join(section.split("\n## ")[0].split())
 
 
 def test_the_file_declares_cff_1_2_0_and_its_required_keys():
@@ -91,11 +98,25 @@ def test_the_cited_dataset_is_typed_in_the_reference_vocabulary():
     assert values("type", reference) == ["data"]
 
 
-def test_the_entry_claims_no_release():
-    """No release has been made, so no version or release date is cited."""
-    software = CFF.read_text().split("\nreferences:\n")[0]
-    assert values("version", software) == []
-    assert values("date-released") == []
+def test_the_entry_cites_the_archived_release():
+    """
+    The entry carries the version DOI of the archived release, the version
+    micecoff reports, the date it was archived, and the concept DOI that
+    resolves to the latest release. The README carries both DOIs under the
+    same two names.
+    """
+    import micecoff
+
+    head = CFF.read_text().split("\nreferences:\n")[0]
+    identifiers = head.split("\nidentifiers:\n")[1].split("\nauthors:\n")[0]
+    assert values("doi", head) == [SOFTWARE_DOI]
+    assert values("version", head) == [micecoff.__version__]
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", values("date-released", head)[0])
+    assert values("type", identifiers) == ["doi"]
+    assert values("value", identifiers) == [SOFTWARE_CONCEPT_DOI]
+    section = citing_section()
+    assert f"version DOI {SOFTWARE_DOI}" in section
+    assert f"concept DOI {SOFTWARE_CONCEPT_DOI}" in section
 
 
 # The released data tables
@@ -120,11 +141,6 @@ def defined_tables():
     """Every table docs/DATA_DICTIONARY.md gives a column list for."""
     dictionary = (ROOT / "docs" / "DATA_DICTIONARY.md").read_text()
     return re.findall(r"^## outputs/(\S+\.csv)$", dictionary, re.M)
-
-
-def citing_section():
-    section = (ROOT / "README.md").read_text().split("\n## Citing\n")[1]
-    return " ".join(section.split("\n## ")[0].split())
 
 
 def test_the_data_entry_declares_cff_1_2_0_as_a_dataset():
@@ -217,14 +233,14 @@ def test_the_data_entry_cites_the_deposit():
     """
     head = data_head()
     identifiers = head.split("\nidentifiers:\n")[1].split("\nauthors:\n")[0]
-    assert values("doi", head) == [VERSION_DOI]
+    assert values("doi", head) == [DATA_DOI]
     assert values("version", head) == ["1.0.0"]
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", values("date-released", head)[0])
     assert values("type", identifiers) == ["doi"]
-    assert values("value", identifiers) == [CONCEPT_DOI]
+    assert values("value", identifiers) == [DATA_CONCEPT_DOI]
     section = citing_section()
-    assert f"version DOI {VERSION_DOI}" in section
-    assert f"concept DOI {CONCEPT_DOI}" in section
+    assert f"version DOI {DATA_DOI}" in section
+    assert f"concept DOI {DATA_CONCEPT_DOI}" in section
 
 
 def test_the_readme_and_the_software_entry_point_at_the_data_entry():
