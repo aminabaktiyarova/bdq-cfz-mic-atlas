@@ -7,7 +7,7 @@ cff-version: 1.2.0
 message: "If you use the released data tables, cite them as below."
 title: "Bedaquiline and clofazimine MIC effect tables for Rv0678, pepQ and atpE variants in Mycobacterium tuberculosis, from the CRyPTIC Consortium Dataset v3.4.0"
 abstract: >-
-  Twelve tables quantifying how mutations in the Rv0678 and MmpL5 efflux axis
+  Thirteen tables quantifying how mutations in the Rv0678 and MmpL5 efflux axis
   shift bedaquiline and clofazimine minimum inhibitory concentrations, with a
   readable report beside each table carrying the same figures and the counts
   they rest on. Every figure derives from the CRyPTIC Consortium Dataset v3.4.0
@@ -21,15 +21,16 @@ abstract: >-
   carry fitted group means and shifts by variant class, the resistant isolates
   no variant in the cohort accounts for and how that fraction moves as genes
   are admitted to the explaining set, shifts for variants detected in a
-  minority of reads, four genotype rules as tests for resistance at every
-  concentration both plate designs determine, twenty tests of ten further
-  genes, HGVS names for the per-variant rows, and the WHO second-edition
-  catalogue measured on this cohort. MICs are interval-censored readings on a
-  doubling series, so group means are fitted by maximum likelihood over the
-  censoring intervals and intervals come from resampling clonal clusters
-  rather than isolates. docs/DATA_DICTIONARY.md defines every column.
-  Resistance in this collection is concentrated at one site by design, so no
-  count in these tables is a prevalence estimate.
+  minority of reads, the Rv0678 frameshift class and its variants refitted
+  with the site that measured them held constant, four genotype rules as tests
+  for resistance at every concentration both plate designs determine, twenty
+  tests of ten further genes, HGVS names for the per-variant rows, and the WHO
+  second-edition catalogue measured on this cohort. MICs are interval-censored
+  readings on a doubling series, so group means are fitted by maximum
+  likelihood over the censoring intervals and intervals come from resampling
+  clonal clusters rather than isolates. docs/DATA_DICTIONARY.md defines every
+  column. Resistance in this collection is concentrated at one site by design,
+  so no count in these tables is a prevalence estimate.
 type: dataset
 doi: "10.5281/zenodo.23194535"
 version: "1.0.0"

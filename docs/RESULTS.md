@@ -769,6 +769,154 @@ Everything in this section is exploratory. The group was chosen for analysis aft
 the excluded isolates were seen to carry more resistance than the reference group,
 and no comparison here was pre-specified.
 
+## The frameshift class and the site that measured it
+
+The Rv0678 frameshift class carries a fitted standard deviation of 2.8 doublings
+on bedaquiline and 2.4 on clofazimine, against 1.1 and 1.3 in the reference
+group, which is the widest spread of any group in
+`outputs/mic_estimates.csv`. 41 of the 51 isolates carrying 192_ins_g come from
+one site in one sublineage, and removing that variant raises the class's
+bedaquiline shift from 0.8 to 2.3 doublings, which the per-variant layer records
+under "Two decompositions a class layer cannot express".
+
+Two explanations for a frameshift that reads as susceptible are in print. One is
+that a frameshift conserving the reading through the open frame or a forward
+alternative frame leaves a functional product. The other is that the isolates
+behind the observation came disproportionately from one laboratory group whose
+MICs sit low. The second is testable on this cohort, because every isolate
+carries the site that measured it. `outputs/frameshift_site.csv` holds the fits
+this section reports.
+
+### Each site's own mean in the reference group
+
+Fitted means in log2 mg/L, from one censored regression of the reference group
+with an indicator per site. The carriers are kept out, because their genotype
+would raise the site they sit at. The censored columns count readings at or
+below the lowest tested concentration.
+
+| Site | Isolates | BDQ censored | BDQ mean | CFZ censored | CFZ mean |
+| --- | --- | --- | --- | --- | --- |
+| 01 | 115 | 7 | -5.6 | 13 | -4.1 |
+| 02 | 1,023 | 75 | -4.9 | 398 | -3.7 |
+| 03 | 1,193 | 141 | -5.9 | 415 | -4.9 |
+| 04 | 1,388 | 591 | -5.7 | 926 | -4.5 |
+| 05 | 3,481 | 234 | -5.4 | 1,879 | -5.0 |
+| 06 | 1,864 | 227 | -5.1 | 745 | -4.1 |
+| 08 | 2,148 | 550 | -5.6 | 739 | -4.3 |
+| 10 | 1,684 | 63 | -4.7 | 509 | -3.7 |
+| 11 | 335 | 21 | -5.6 | 134 | -4.9 |
+| 14 | 281 | 3 | -4.4 | 13 | -3.3 |
+| 17 | 70 | 0 | -5.0 | 4 | -3.9 |
+| 20 | 431 | 11 | -4.7 | 12 | -3.5 |
+
+The isolate counts differ by a few between the drugs, because an isolate can
+carry one MIC and not the other; the bedaquiline counts are given. Site 05 is
+the site that contributes 41 of the 51 192_ins_g isolates. Its bedaquiline mean
+is -5.4 against -5.3 for the reference group as a whole, with five of the twelve
+sites lower. Its clofazimine mean is -5.0 against -4.4, the lowest of the
+twelve. The clofazimine means rest on data that is 41% left-censored across the
+cohort and 54% at site 05, so they are less firmly placed than the bedaquiline
+ones.
+
+### The class and its variants with the site held constant
+
+Shifts in doublings against the reference group, to one decimal. Each pair of
+fits runs on the same rows under one standard deviation and differs only in the
+site indicators, so the distance between the two is the site adjustment. The
+intervals resample clusters, 400 draws each.
+
+Bedaquiline:
+
+| Group | Isolates | Clusters | Plain | 95% | Site-adjusted | 95% |
+| --- | --- | --- | --- | --- | --- | --- |
+| Rv0678 frameshift | 148 | 60 | 1.1 | -0.2 to 2.6 | 1.0 | -0.3 to 2.3 |
+| the same class without 192_ins_g | 97 | 51 | 2.3 | 1.8 to 2.7 | 2.0 | 1.5 to 2.4 |
+| Rv0678 141_ins_c | 36 | 14 | 2.8 | 2.2 to 3.2 | 2.5 | 2.0 to 2.8 |
+| Rv0678 138_ins_g | 18 | 7 | 2.6 | 1.4 to 3.3 | 2.2 | 1.2 to 3.0 |
+| Rv0678 192_ins_g | 51 | 9 | -1.3 | -2.6 to 3.2 | -1.2 | -2.3 to 2.7 |
+| the remaining frameshifts | 43 | 30 | 1.7 | 1.1 to 2.4 | 1.5 | 0.9 to 2.1 |
+
+Clofazimine:
+
+| Group | Isolates | Clusters | Plain | 95% | Site-adjusted | 95% |
+| --- | --- | --- | --- | --- | --- | --- |
+| Rv0678 frameshift | 148 | 60 | 1.0 | -0.1 to 2.2 | 0.9 | 0.2 to 1.7 |
+| the same class without 192_ins_g | 97 | 51 | 1.9 | 1.3 to 2.4 | 1.5 | 1.0 to 1.9 |
+| Rv0678 141_ins_c | 36 | 14 | 2.2 | 1.5 to 2.7 | 1.7 | 1.3 to 2.1 |
+| Rv0678 138_ins_g | 18 | 7 | 2.6 | 1.0 to 3.5 | 2.1 | 0.5 to 2.9 |
+| Rv0678 192_ins_g | 51 | 9 | -1.0 | -2.0 to 2.2 | -0.6 | -1.3 to 1.6 |
+| the remaining frameshifts | 43 | 30 | 1.3 | 0.6 to 2.0 | 1.0 | 0.4 to 1.7 |
+
+A joint fit shares one standard deviation across the reference group and the
+carriers, so its class shift of 1.1 is not the 0.8 in
+`outputs/mic_estimates.csv`, which fits each class against a reference group
+fitted on its own. The comparison this table supports is between its own two
+columns.
+
+### Spread before and after the site means
+
+Standard deviations in doublings, each group fitted on its own rows, once with
+an intercept alone and once with an intercept and site indicators.
+
+| Group | Isolates | BDQ sd | BDQ within-site | CFZ sd | CFZ within-site |
+| --- | --- | --- | --- | --- | --- |
+| Rv0678 frameshift | 148 | 2.8 | 1.5 | 2.4 | 1.6 |
+| the same class without 192_ins_g | 97 | 1.6 | 1.5 | 1.8 | 1.7 |
+| Rv0678 192_ins_g | 51 | 4.9 | 1.1 | 2.9 | 1.2 |
+| reference group | 14,013 | 1.1 | 1.0 | 1.3 | 1.2 |
+
+### The site and the sub-floor readings
+
+The site is not why 192_ins_g reads below the plate on bedaquiline. All 39 of
+its sub-floor bedaquiline readings come from site 05, where 39 of its 41
+isolates sit at the floor, while the 10 isolates at the four other sites were
+every one measured on the plate. At that same site the reference isolates read
+-5.4 against -5.3 for the cohort, so the site's own readings sit 0.1 doublings
+below the cohort mean. That cannot put a variant's carriers three doublings
+below the lowest tested concentration.
+
+On clofazimine site 05 is the lowest of the twelve sites, and holding the site
+constant accounts for 0.4 of that variant's negative shift of 1.0 and leaves
+0.6.
+
+Holding the site constant takes 0.2 doublings off the class's bedaquiline shift
+and 0.1 off its clofazimine shift. The cluster-resampled interval on the class
+shift includes zero under both bedaquiline fits and under the plain clofazimine
+fit. That width comes from the clone: resampling draws from the class's 60
+clusters, one of which holds 41 of its 148 isolates. The
+three other variant groups keep most of what they carry: on bedaquiline
+141_ins_c moves from 2.8 to 2.5, 138_ins_g from 2.6 to 2.2, and the remaining
+frameshifts from 1.7 to 1.5.
+
+The class's bedaquiline spread falls from 2.8 to 1.5 when the site means are
+removed, and from 2.8 to 1.6 when 192_ins_g's carriers are removed instead.
+The two operations take out the same thing in this cohort, because that variant
+is concentrated at one site, and nothing here separates them. What remains in
+either case, 1.5 or 1.6 doublings, is still above the reference group's 1.1.
+
+No mean for 192_ins_g is identified by either fit. 39 of its 51 bedaquiline
+readings and 40 of its 51 clofazimine readings sit at or below the lowest tested
+concentration, the plain fit lands at -10.08 against a floor of -6.97, and the
+within-site fit lands at -7.50, which is still below that floor. Its spread
+falling from 4.9 to 1.1 says that the readings inside its largest site level are
+alike. Where that level sits is what no reading above the floor fixes.
+
+### Limitations of this comparison
+
+Holding the site constant does not say what a site is. It is a laboratory, a
+patient population and a treatment history at once, and these data separate
+none of them. A site indicator removes whatever the sites differ in, and the
+readings that remain are compared within site.
+
+The site means for clofazimine rest on a reference group that is 41%
+left-censored, and the 192_ins_g estimates on a group that is 76% left-censored
+on bedaquiline. The censored likelihood handles that, and it means the figures
+above are placed by the few readings above the floor.
+
+Everything in this section is exploratory. 192_ins_g was chosen for analysis
+after its shift was withheld as extrapolation, and no comparison here was
+pre-specified.
+
 ## Resistance the genotype does not explain
 
 An isolate is genotypically unexplained when it is resistant and carries no real

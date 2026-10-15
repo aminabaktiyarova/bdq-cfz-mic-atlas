@@ -235,6 +235,64 @@ dropped from the joint fits rather than left in them as reference.
 
 ---
 
+## outputs/frameshift_site.csv
+
+Written by `code/frameshift_site.py`. Shifts and standard deviations for the
+Rv0678 frameshift class and its individual variants with the contributing site
+held constant, stacked with two columns naming which estimate and which group
+structure each row belongs to.
+
+| Column | Type | Definition |
+| --- | --- | --- |
+| `drug` | text | BDQ or CFZ |
+| `estimate` | text | `plain shift` and `site-adjusted shift` for the two fits that hold the reference group and the carriers in one regression, the second carrying an indicator per site; `plain spread` and `within-site spread` for the two fits of one group on its own rows, the second carrying those indicators; `reference site mean` for one site's own mean in the reference group |
+| `structure` | text | `class` holds the frameshift class as one group, `class less one` the same class with 192_ins_g's carriers taken out of the rows, `variants` a column each for 141_ins_c, 138_ins_g, 192_ins_g and the remaining frameshifts, `spread` the fits of a group on its own rows, and `site` the reference group fitted with an indicator per site |
+| `group` | text | The group estimated: `Rv0678 frameshift`, `Rv0678 frameshift without 192_ins_g`, `Rv0678 141_ins_c`, `Rv0678 138_ins_g`, `Rv0678 192_ins_g`, `Rv0678 frameshift, the other variants`, `reference`, or `site NN` on a site row |
+| `isolates` | integer | Isolates in the group carrying a placeable MIC for that drug, and on a site row the reference isolates measured at that site |
+| `clusters` | integer | Distinct combinations of site, sublineage and defining mutation |
+| `sites` | integer | Collection sites those isolates come from. 1 on a site row, more on the pooled `other` level |
+| `largest_cluster` | integer | Isolates in the largest of those clusters |
+| `resistant` | integer | Of those isolates, above the ECOFF |
+| `left_censored` | integer | Of those isolates, inhibited at or below the lowest tested concentration |
+| `right_censored` | integer | Of those isolates, growing at the highest tested concentration |
+| `reference_mean` | log2 mg/L | Intercept of the joint fit, which is the reference group's fitted mean. On a `site-adjusted shift` row, that mean at the baseline site, which is the first site label in sorted order. On a site row, the baseline site's mean. Empty on a spread row |
+| `shift` | doublings | The group's fitted mean minus the reference mean, and on a site row that site's mean minus the baseline site's. Empty on a spread row or where withheld |
+| `shift_low` | doublings | Lower bound of the 95% interval on the shift, from resampling clusters |
+| `shift_high` | doublings | Upper bound of the same interval |
+| `draws` | integer | Resampled fits the interval rests on, of the 400 drawn. A draw carrying no isolate of the group is dropped for that group |
+| `fitted_mean` | log2 mg/L | On a shift row, the reference mean plus the shift. On a `plain spread` row, the group's own fitted mean. On a `within-site spread` row, the isolate-weighted average of its fitted site means |
+| `sigma` | log2 mg/L | Fitted standard deviation. One value shared across the groups of a joint fit, the group's own on a spread row |
+| `tested_floor` | log2 mg/L | Lowest concentration tested on the plate designs those isolates were measured on |
+| `tested_ceiling` | log2 mg/L | Highest concentration tested on those designs |
+| `note` | text | Why an estimate is empty, where a fitted mean lies more than one doubling outside the tested range, and which site row is the baseline level. Blank where there is nothing to report |
+
+The two rows of a shift pair are fitted on the same rows and differ only in the
+site indicators, so the distance between them is the site adjustment. A joint
+fit shares one standard deviation across the reference group and the carriers,
+so its shifts differ from the per-class shifts in `outputs/mic_estimates.csv`,
+which fits each class against a reference group fitted on its own.
+
+A site carrying fewer than 30 isolates is pooled into one `other` level in the
+joint fits, and fewer than 5 in the fits of a group on its own rows, where the
+joint threshold would leave one level and the site indicators nothing to
+remove. A group resting on fewer than 5 clusters is dropped from the design and
+its rows from the fit, with the reason in `note`, as the per-variant layer
+withholds such a variant.
+
+The site rows carry each site's own mean in the reference group, fitted with
+an indicator per site on reference isolates alone. A claim that one laboratory
+group reads low is a claim about those means, and the carriers are kept out of
+them because their genotype would raise the site they sit at.
+
+The spread rows carry what a shared standard deviation cannot. They also show
+what a mean for 192_ins_g rests on: 39 of its 51 bedaquiline readings and 40 of
+its 51 clofazimine readings sit at or below the lowest tested concentration, so
+its mean and its standard deviation are identified jointly by the readings
+above the floor, and `outputs/atlas_evidence.csv` withholds a shift for it on
+that ground.
+
+---
+
 ## outputs/prediction_thresholds.csv
 
 Written by `code/prediction_metrics.py`. The same four rules as

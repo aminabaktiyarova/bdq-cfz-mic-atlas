@@ -118,6 +118,7 @@ python code/validate.py             # the held-out test, runs once
 python code/build_atlas.py          # per-variant evidence and shifts
 python code/unexplained.py          # resistance carrying no variant in the three genes
 python code/heteroresistance.py     # the samples excluded as uncertain
+python code/frameshift_site.py      # Rv0678 frameshifts, site held constant
 python code/prediction_metrics.py   # genotype rules as tests for resistance
 python code/benchmark_catalogue.py  # the genotype layer against the WHO catalogue
 python code/wider_gene_set.py       # whether more genes explain the unexplained tier
@@ -178,6 +179,7 @@ table is defined in `docs/DATA_DICTIONARY.md`.
 | `mic_estimates.csv` | `code/mic_model.py` |
 | `unexplained_counts.csv`, `unexplained_gene_sets.csv` | `code/unexplained.py` |
 | `heteroresistance_estimates.csv`, `multi_allele_counts.csv` | `code/heteroresistance.py` |
+| `frameshift_site.csv` | `code/frameshift_site.py` |
 | `prediction_metrics.csv`, `prediction_thresholds.csv` | `code/prediction_metrics.py` |
 | `wider_gene_set.csv` | `code/wider_gene_set.py` |
 | `benchmark_metrics.csv` | `code/benchmark_catalogue.py` |
@@ -192,7 +194,7 @@ Outputs are regenerated from the CRyPTIC release and are not tracked.
 pytest
 ```
 
-The suite is 493 tests against synthetic data with known ground truth planted
+The suite is 515 tests against synthetic data with known ground truth planted
 in it: a dataset built to the CRyPTIC schema for the pipeline, and reports
 simulated onto a plate's dilution series for the micecoff package. It needs no
 downloaded data and finishes in about two minutes. One of the tests reads that
@@ -208,8 +210,11 @@ as a measurement, and that the censored estimator recovers parameters a median
 cannot. That the Mantel-Haenszel estimate recovers a known odds ratio across
 sites of different baseline risk, and that the homogeneity test fires when the
 effect differs between them. That collapsing clonal clusters removes an effect
-planted so as to be driven entirely by one outbreak. That the prediction
-interval is never narrower than the discovery and held-out errors combined. That
+planted so as to be driven entirely by one outbreak. That holding the
+contributing site constant recovers a shift planted in a cohort whose carriers
+sit at one site, and leaves a shift where it is when the same carriers are
+spread across the sites. That the prediction interval is never narrower than
+the discovery and held-out errors combined. That
 a resistant isolate whose genes could not be called is counted neither as
 carrying a variant nor as lacking one. That a deletion the source table writes
 twice counts as one variant, and that the larger of two deletions in one gene is
